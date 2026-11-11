@@ -112,7 +112,7 @@ async fn start_server(settings: &Settings, settings_file: Option<&Path>) -> Resu
         if Instant::now() >= deadline {
             bail!(
                 "started forge serve, but it didn't take connections within {timeout_ms} ms \
-                 (`server.start_timeout_ms`); its log is {}",
+                 (`server.start_timeout_ms`). Its log is {}; `forge serve` in a terminal shows why it stops",
                 log.display()
             );
         }

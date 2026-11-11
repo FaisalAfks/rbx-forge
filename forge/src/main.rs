@@ -125,12 +125,25 @@ async fn stop(settings: &Settings, file: Option<&Path>) -> Result<()> {
         return Ok(());
     };
     match link.request(&Message::Stop).await? {
-        Message::Stopping => {
-            println!("stopped forge serve on port {}", settings.server.port);
-            Ok(())
-        }
+        Message::Stopping => {}
         other => bail!("forge serve answered stop with {other:?}"),
     }
+    // Wait until the port is free, so a command right after this one starts a new server instead of finding the
+    // old one on its way out.
+    let port = settings.server.port;
+    let deadline = std::time::Instant::now()
+        + std::time::Duration::from_millis(settings.server.start_timeout_ms);
+    while tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port))
+        .await
+        .is_ok()
+    {
+        if std::time::Instant::now() >= deadline {
+            bail!("forge serve said it was stopping, but port {port} is still taken");
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    println!("stopped forge serve on port {port}");
+    Ok(())
 }
 
 async fn status(settings: &Settings, file: Option<&Path>) -> Result<()> {

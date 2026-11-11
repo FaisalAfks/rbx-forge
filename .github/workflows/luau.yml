@@ -25,9 +25,12 @@ jobs:
       - uses: CompeyDev/setup-rokit@v0.2.1
       - name: Format
         run: stylua --check plugin tools
+      # Each check runs even when one before it fails, so one run reports every problem.
       - name: Lint
+        if: ${{ !cancelled() }}
         run: selene plugin tools
       - name: Types
+        if: ${{ !cancelled() }}
         run: |
           cargo run --quiet --locked -- plugin sourcemap > sourcemap.json
           curl --fail --silent --show-error --location --output globalTypes.d.luau \

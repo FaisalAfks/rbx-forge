@@ -58,12 +58,8 @@ function link.start(settings: Settings): Connection
 
 	-- One try: open, say hello, and hold the connection until it closes. Returns whether it opened.
 	local function try(): boolean
-		local ok, client = pcall(
-			HttpService.CreateWebStreamClient,
-			HttpService,
-			Enum.WebStreamClientType.WebSocket,
-			{ Url = url }
-		)
+		local ok, client =
+			pcall(HttpService.CreateWebStreamClient, HttpService, Enum.WebStreamClientType.WebSocket, { Url = url })
 		if not ok then
 			return false
 		end

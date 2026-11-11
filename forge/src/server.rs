@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -52,14 +52,20 @@ pub async fn run(port: u16, log_to: Option<&Path>) -> Result<()> {
             .with_context(|| format!("can't write {}", path.display()))?;
         let _ = LOG.set(Mutex::new(file));
     }
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port))
-        .await
-        .with_context(|| {
-            format!(
-                "can't listen on 127.0.0.1:{port}. Either forge serve is already running (`forge status` says), \
-                 or another program uses the port: change `server.port` in the settings file (`forge config`)"
-            )
-        })?;
+    let listener = match TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await {
+        Ok(listener) => listener,
+        Err(err) => {
+            let message = format!(
+                "can't listen on 127.0.0.1:{port} ({err}). Either forge serve is already running (`forge status` \
+                 says), or another program uses the port: change `server.port` in the settings file (`forge config`)"
+            );
+            // A server started in the background has no terminal, so the reason goes in its log too.
+            if LOG.get().is_some() {
+                log(&message);
+            }
+            bail!(message);
+        }
+    };
     log(&format!(
         "forge serve {} on 127.0.0.1:{port}",
         env!("CARGO_PKG_VERSION")
@@ -81,6 +87,8 @@ pub async fn run(port: u16, log_to: Option<&Path>) -> Result<()> {
     }
 
     log("stopping");
+    // The port is free from here, so a new server can start while these connections close.
+    drop(listener);
     // Each connection sees the stop and closes itself, so plugins get a clean close and start retrying.
     let _ = tokio::time::timeout(STOP_WAIT, async {
         while connections.join_next().await.is_some() {}
