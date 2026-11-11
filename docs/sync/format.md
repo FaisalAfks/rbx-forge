@@ -25,8 +25,9 @@ A `_.toml` holds, in this order:
 6. One section per child without children, by disk name: `[Name]`, then that child's own `class`, `name`,
    `tags`, properties and `[Name.attributes]`.
 
-A table that isn't a property of the class is a child. A child that gets children of its own moves from its
-parent's `_.toml` into a folder.
+A table with a `class` key is a child. No table-shaped value (Font, PhysicalProperties, Ray) has one, so this holds
+even after a Studio update adds a property with the same name as an existing child. A child that gets children of
+its own moves from its parent's `_.toml` into a folder.
 
 Sibling order isn't stored. Neither folders nor TOML sections keep it, and UI order comes from `LayoutOrder`.
 
@@ -84,7 +85,8 @@ them. `[0, 340, 0, 66]` could be a UDim2 or a Rect.
 | Ref | a path, see below | `PrimaryPart = "@World/Strip"` |
 
 **Numbers** keep every bit (decisions 0011 and 0014):
-- A whole float up to 2^53 is written without a decimal point (`1`, not `1.0`).
+- A whole float up to 2^53 is written without a decimal point (`1`, not `1.0`). Above that it keeps `.0` or an
+  exponent, so it never reads as an integer too big for TOML.
 - Very small or large numbers use an exponent (`1e-7`, `5e-324`).
 - `-0.0`, `inf`, `-inf` and `nan` are written as such. The shortest text comes from Rust's standard float
   formatting, which is exact the same way the `ryu` algorithm named in decision 0014 is.

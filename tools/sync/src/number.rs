@@ -21,7 +21,14 @@ pub fn float(x: f64) -> String {
     // numbers short (5e-324 instead of 320 digits).
     let plain = format!("{x}");
     let exp = format!("{x:e}");
-    if exp.len() < plain.len() { exp } else { plain }
+    let text = if exp.len() < plain.len() { exp } else { plain };
+    // A whole number above 2^53 written as bare digits would read as a TOML integer, which can overflow `i64`;
+    // `.0` keeps it a float.
+    if text.bytes().all(|b| b.is_ascii_digit() || b == b'-') {
+        format!("{text}.0")
+    } else {
+        text
+    }
 }
 
 #[cfg(test)]
@@ -56,6 +63,10 @@ mod tests {
             MAX_EXACT_INT,
             MAX_EXACT_INT + 2.0,
             123456.789,
+            2f64.powi(63), // as bare digits it overflows a TOML integer
+            -(2f64.powi(63)),
+            2f64.powi(64),
+            1.2345678901234567e19,
             f64::INFINITY,
             f64::NEG_INFINITY,
             f32::MAX as f64,

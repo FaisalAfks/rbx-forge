@@ -474,10 +474,34 @@ fn sibling_order_doesnt_change_the_files() {
     shuffled.children.reverse();
     for c in shuffled.children.iter_mut() {
         c.children.reverse();
+        for g in c.children.iter_mut() {
+            g.tags.reverse();
+        }
     }
     assert_eq!(
         layout::write(&tree, &s).unwrap(),
         layout::write(&shuffled, &s).unwrap()
+    );
+}
+
+#[test]
+fn old_files_read_the_same_after_studio_adds_a_property() {
+    // `Caps` is a leaf child of the ScreenGui. If a later Studio gives ScreenGui a property called Caps, the old
+    // `[Caps]` section must still read as the child, not as that property.
+    let s = schema();
+    let files = layout::write(&sample(), &s).unwrap();
+    let mut newer = s.clone();
+    newer
+        .classes
+        .get_mut("ScreenGui")
+        .unwrap()
+        .properties
+        .insert("Caps".into(), forge_sync::value::ValueType::Bool);
+    let back = layout::read(&files, &newer).unwrap_or_else(|e| panic!("{e:#}"));
+    assert!(
+        back.children
+            .iter()
+            .any(|c| c.name == "Caps" && c.class == "Folder")
     );
 }
 

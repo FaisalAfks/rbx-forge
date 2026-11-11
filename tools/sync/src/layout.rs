@@ -88,7 +88,10 @@ fn assign_keys(node: &Node, schema: &Schema, path: &mut Vec<String>, keys: &mut 
 
 /// A hash of a node's content (not its id or disk name), so repeats are numbered the same way every time.
 fn fingerprint(node: &Node) -> u64 {
-    let mut s = format!("{}\n{}\n{:?}\n", node.class, node.name, node.tags);
+    // Tags are a set; Studio doesn't promise their order.
+    let mut tags = node.tags.clone();
+    tags.sort();
+    let mut s = format!("{}\n{}\n{tags:?}\n", node.class, node.name);
     let r: crate::value::RefWriter = &|_| Ok("ref".into());
     for (k, v) in node.properties.iter().chain(&node.attributes) {
         s.push_str(&format!("{k}={}\n", v.to_toml(r).unwrap_or_default()));
@@ -384,6 +387,14 @@ fn read_body(
                     );
                 }
             }
+            // A table with `class` is always a child, whatever the schema says. A later Studio can add a property
+            // with the same name as an existing child, and old files must still read the same way.
+            _ if v.as_table().is_some_and(|t| t.contains_key("class")) => match v.as_table() {
+                Some(t) if top => leaves.push((k.clone(), t.clone())),
+                _ => bail!(
+                    "{k:?} is a child inside a child's section; an instance with children is a folder"
+                ),
+            },
             _ => match schema.property(&class, k) {
                 Some(ty) => {
                     node.properties.insert(
@@ -391,13 +402,7 @@ fn read_body(
                         Value::from_toml(v, ty).with_context(|| k.to_string())?,
                     );
                 }
-                None => match v.as_table() {
-                    Some(t) if top => leaves.push((k.clone(), t.clone())),
-                    Some(_) => bail!(
-                        "{k:?} isn't a property of {class}; an instance with children is a folder"
-                    ),
-                    None => bail!("{k:?} isn't a property of {class}"),
-                },
+                None => bail!("{k:?} isn't a property of {class}"),
             },
         }
     }
