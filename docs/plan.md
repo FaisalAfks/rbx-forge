@@ -124,48 +124,48 @@ watches, drops echoes and shows the widget. The CLI owns:
 
 **Steps, in order.** Each is an issue on the board; a step starts only when the one before it is merged.
 
-1. **The CLI's base and CI:**
+1. **The CLI's base and CI (#31):**
    - the Cargo workspace and the `forge` binary;
    - reading a game's `forge.toml` (place id, which trees go where);
    - config defaults (port, quiet times, poll interval);
    - a CI workflow for format, lint and tests.
-2. **Values and the layout, without Studio:**
+2. **Values and the layout, without Studio (#32):**
    - how each Roblox value type is written in TOML, documented in `docs/sync/format.md`;
    - floats in their shortest exact form, with `inf` and `nan`;
    - a tree turned into layout C and read back: names with `~2` and `%XX`, `@path` references, promotion of a leaf to
      a folder, and a MeshPart's `.rbxm`;
    - each file written whole, in one fixed form.
-3. **The link:**
+3. **The link (#33):**
    - `forge serve`, started by any command that needs it;
    - the plugin's WebSocket client, which reconnects quietly and never prompts or blocks Studio;
    - `forge plugin install`, which packs the `.rbxmx`;
    - `forge status`, which lists connected Studios;
    - the Luau checks in CI.
-4. **Pull:**
+4. **Pull (#34):**
    - the plugin reads each tree: saved properties through `ReflectionService` plus the twin list, script text through
      `ScriptEditorService`, and each MeshPart as a model file, with a timeout;
    - `forge sync pull` writes it to disk.
 5. **The drafts warning (#20):** pull and diff warn when a script has an uncommitted draft.
-6. **Diff:** `forge sync diff` lists added, removed, moved and renamed instances, and changed properties with their
+6. **Diff (#35):** `forge sync diff` lists added, removed, moved and renamed instances, and changed properties with their
    old and new values.
-7. **Push, with the widget's confirm:**
+7. **Push, with the widget's confirm (#36):**
    - the plugin's widget, its look picked from rendered options;
    - the plan shown in the widget, applied on Apply;
    - a backup in `.forge/backup/<time>/`;
    - one undo step;
    - references set after every instance exists, and MeshParts started from their model files.
-8. **The round-trip check:** `forge sync check` pulls a tree, pushes it into a scratch copy, pulls that, and compares
+8. **The round-trip check (#37):** `forge sync check` pulls a tree, pushes it into a scratch copy, pulls that, and compares
    them value by value (decision 0011).
-9. **Watch, Studio to disk:**
+9. **Watch, Studio to disk (#38):**
    - the plugin's events and script poll, merged per frame and sent when quiet;
    - echoes dropped by value;
    - the files written.
-10. **Watch, disk to Studio, and clashes:**
+10. **Watch, disk to Studio, and clashes (#39):**
     - folder watching with a quiet period, and hashes;
     - the three-way merge;
     - clashes held and listed in `forge sync status` and the widget, until a side is picked.
-11. **The MCP:** `forge mcp` with tools for status, pull, diff, push (proposes only), check and clashes.
-12. **The guide, the skill and v0.1.0:**
+11. **The MCP (#40):** `forge mcp` with tools for status, pull, diff, push (proposes only), check and clashes.
+12. **The guide, the skill and v0.1.0 (#41):**
     - `docs/sync/` says what sync reads, writes and never touches;
     - `.agents/skills/sync` tells agents when and how to use it;
     - the first release, with binaries.
