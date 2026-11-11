@@ -71,9 +71,10 @@ Each is an issue on the board and ends in a decision record.
    decision 0006:** A; B loses script text and is kept only as a fallback.
 2. **Identity:** how does forge know an instance after a rename or a move, and how are references written: `UniqueId`
    in the model data (plugins can't read it), or an id of forge's own? (The Lune and rbx-dom half was dropped by
-   decision 0006.)
-3. **Readable layout:** how nested instances and scripts look on disk. At least two layouts compared on the HUD, the
-   arena and a code folder: size, readability, and the diff after a colour change, a moved frame, an added button, a
+   decision 0006.) **Answered by decision 0007:** nothing is written into the game; the plugin follows live objects,
+   the disk path is the identity, and references are written as paths.
+3. **Readable layout:** how nested instances and scripts look on disk, with every path unique (siblings can share a
+   name) and references written as paths. At least two layouts compared on the HUD, the arena and a code folder: size, readability, and the diff after a colour change, a moved frame, an added button, a
    renamed script and a script moved under a part.
 4. **Round trip:** Studio → disk → Studio, compared object by object, property by property, scripts included.
 5. **The link:** how the CLI and Studio talk. A plugin with a WebSocket or HTTP to `localhost`, against the CLI calling
