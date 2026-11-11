@@ -26,3 +26,6 @@ local connection = link.start({
 })
 
 plugin.Unloading:Connect(connection.stop)
+
+local broken: number = "not a number"
+print(broken)
