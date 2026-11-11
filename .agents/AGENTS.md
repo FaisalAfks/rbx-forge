@@ -8,7 +8,7 @@ How to work in this repo. Read by Claude Code through `CLAUDE.md`, by Antigravit
 
 rbx-forge: the home for Roblox tooling. **Build tools, not just games.** Every tool has a CLI and an MCP, so agents,
 scripts and people all use the same thing, and a Studio plugin side where it needs one. The first tool is **sync**:
-a game's UI, maps and models in git as readable files, next to its code (Studio's Script Sync handles code).
+a whole game in git as readable files, code included, as one nested tree.
 
 What's built next and why is in [docs/plan.md](../docs/plan.md); why things are the way they are is in
 [docs/decisions/](../docs/decisions/README.md).
@@ -52,7 +52,8 @@ powershell -File scripts/setup-dev.ps1   # once per clone: the .claude/skills li
 - A tool never knows about one game. Game-specific settings live in the game's repo (a `forge.toml`).
 - Every tool works from the CLI, from the MCP, and from Studio when it has a Studio side.
 - Each tool's doc says what it reads, what it writes, and what it never touches.
-- Scripts are never touched by forge: Script Sync owns them.
+- Script text is read and written only through `ScriptEditorService`; `Script.Source` can be empty when the editor
+  isn't (decision 0005).
 
 **How work is done**
 - Research before building: check how Studio, a library or an API really behaves (its docs, a probe) before building

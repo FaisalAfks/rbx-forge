@@ -7,8 +7,8 @@ it needs one. A tool never knows about one game: a game says what it wants in it
 
 ## Tools
 
-- **sync** (planned): a game's UI, maps and models in git as readable files, and back into Studio. Code stays with
-  Studio's Script Sync.
+- **sync** (planned): a whole game in git as readable files, code, UI, maps and models as one nested tree, and back
+  into Studio.
 
 What's built next is in [docs/plan.md](docs/plan.md); why, in [docs/decisions/](docs/decisions/README.md). How to work
 in the repo is in [.agents/AGENTS.md](.agents/AGENTS.md).
