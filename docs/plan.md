@@ -176,6 +176,7 @@ Each step also updates `docs/sync/` with what it adds, so the guide is never beh
 ## Afterwards (issues, not now)
 
 Candidates for later, each only if it earns its place:
+- `forge ui shot`: a PNG of any screen at phone, tablet or desktop size, for agents to look at (#47, decision 0016);
 - `forge assets`: the manifest and upload through the MCP;
 - `forge test`: the Studio CLI's RunScript, plus scenario playtests;
 - `forge api`: a diff of `--fullApi` for each Studio update;
