@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe 8 checks which Studio-only features a tool can reach. The debugger can be reached; Script Analysis can only
+  take extra results; drafts and the Asset Manager can't. Stale script text comes from uncommitted drafts. Four
+  tools follow as issues (#19, decision 0009)
+
 - Probe 3 picks the disk layout: a folder only for instances with children, a `_.toml` per folder holding its own
   properties and its leaf children, and scripts as plain `.luau` files. Three layouts were compared on real data by
   file count and git diffs (#5, decision 0008)

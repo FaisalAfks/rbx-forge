@@ -13,3 +13,4 @@ A decision is changed by a new record that replaces the old one, never by editin
 | [0006](0006-read-with-luau.md) | Studio reads the tree with Luau (candidate A); model data only where Luau can't reach | 2026-11-11 |
 | [0007](0007-identity-outside-the-game.md) | Identity is kept outside the game: live objects in Studio, paths on disk | 2026-11-11 |
 | [0008](0008-layout-folders-where-needed.md) | Disk layout: folders only where there are children | 2026-11-11 |
+| [0009](0009-studio-only-features.md) | Studio-only features: what a tool can reach (drafts, lint, debugger, assets) | 2026-11-11 |

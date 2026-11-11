@@ -84,6 +84,9 @@ Each is an issue on the board and ends in a decision record.
 7. **Live changes:** catching changes on each side as they happen (Studio's change events, file watching), without
    loops, and what happens when both sides change the same instance.
 
+8. **Studio-only features:** which of Studio's windows (drafts, Script Analysis, the debugger, the Asset Manager) a
+   tool can reach. **Answered by decision 0009;** the tools it suggests are issues #20 to #23.
+
 The tool is then built from the results, in PR-sized steps: the readable layout, then pull, diff, push, watch, the MCP
 and the plugin.
 
