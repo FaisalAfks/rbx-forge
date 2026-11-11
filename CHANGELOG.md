@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe #46 shows that forge can build a place without Studio. Model files written in Rust with rbx-dom loaded into
+  Studio identical to the originals: 180 instances and 8,133 property reads, 0 differences. The Studio command line
+  can't save a place and needs a login, so it isn't used for builds. `forge build` follows as #50 (decision 0017)
+
 - Probe #45 finds that a plugin can capture Studio's viewport itself (`CaptureService`, then `EditableImage` for the
   pixels) in 0.6 s, and that a frame with a `UIScale` lays UI out as on any screen size. `forge ui shot` follows as
   #47. Capturing during a playtest wasn't tested and is probe #48 (decision 0016)
