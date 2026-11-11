@@ -1,5 +1,5 @@
 # Set up an rbx-forge clone for development. Run once per clone, from anywhere:
-#   pwsh scripts/setup-dev.ps1            # skills link + pre-commit hooks
+#   powershell -File scripts/setup-dev.ps1            # skills link + pre-commit hooks
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot

@@ -23,7 +23,7 @@ The tool folders (`forge/`, `mcp/`, `plugin/`, `tools/<name>/`) come with the fi
 ## Commands
 
 ```bash
-pwsh scripts/setup-dev.ps1   # once per clone: the .claude/skills link and the pre-commit hooks
+powershell -File scripts/setup-dev.ps1   # once per clone: the .claude/skills link and the pre-commit hooks
 ```
 
 ## Rules
