@@ -1,0 +1,20 @@
+name: Feature
+description: A new tool, or a new feature in one
+labels: ["type: feature"]
+projects: ["FaisalAfks/2"]
+body:
+  - type: dropdown
+    id: tool
+    attributes: { label: Tool, options: ["sync", "repo", "a new tool"] }
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes: { label: What it should do }
+    validations: { required: true }
+  - type: textarea
+    id: why
+    attributes: { label: Why it's needed, description: "What it makes possible or easier." }
+    validations: { required: true }
+  - type: textarea
+    id: done
+    attributes: { label: Done when, description: "What has to be shown for it to count as done." }

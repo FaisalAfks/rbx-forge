@@ -1,0 +1,5 @@
+# made by scripts/setup-dev.ps1: a link to .agents/skills for Claude Code
+.claude/skills
+# a push's backups and other local state
+.forge/
+.vscode/
