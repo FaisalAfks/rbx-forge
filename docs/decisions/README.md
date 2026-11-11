@@ -18,3 +18,5 @@ A decision is changed by a new record that replaces the old one, never by editin
 | [0011](0011-round-trip.md) | Round trip is exact; MeshParts start from a small model file | 2026-11-11 |
 | [0012](0012-plugin-websocket-link.md) | The CLI and Studio talk over a WebSocket held by forge's plugin | 2026-11-11 |
 | [0013](0013-live-sync.md) | Live sync: merged per frame, compared by value, clashes held | 2026-11-11 |
+| [0014](0014-cli-in-rust.md) | The CLI and MCP are written in Rust | 2026-11-11 |
+| [0015](0015-how-forge-runs.md) | One forge server per PC, a packed plugin, pushes confirmed in Studio | 2026-11-11 |

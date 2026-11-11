@@ -62,7 +62,7 @@ What's settled either way:
 - A push never runs without a shown plan and an OK.
 - A push keeps a backup of what it replaced (`.forge/backup/<time>/`).
 
-## Probes first (no code until these answer)
+## Probes (all answered)
 
 Each is an issue on the board and ends in a decision record.
 
@@ -90,8 +90,88 @@ Each is an issue on the board and ends in a decision record.
 8. **Studio-only features:** which of Studio's windows (drafts, Script Analysis, the debugger, the Asset Manager) a
    tool can reach. **Answered by decision 0009;** the tools it suggests are issues #20 to #23.
 
-The tool is then built from the results, in PR-sized steps: the readable layout, then pull, diff, push, watch, the MCP
-and the plugin.
+## Building sync
+
+The probes are answered, so sync is built from decisions 0005 to 0015, in PR-sized steps.
+- This order replaces the one first written here ("the layout, then pull, diff, push, watch, the MCP and the plugin").
+  Nothing can be pulled before the plugin and its link exist (decision 0012), so they come before pull.
+- The CLI, its server and the MCP are Rust (decision 0014).
+- One `forge serve` per PC holds the plugin's link, the plugin is packed into one `.rbxmx` by forge, and a push is
+  applied only after Apply is clicked in Studio (decision 0015).
+
+**Where the code goes:**
+
+```
+forge/          the `forge` binary: commands, the server, `forge mcp`, `forge plugin install`   (Rust)
+mcp/            the MCP server's tools, used by `forge mcp`                                      (Rust)
+tools/sync/     sync's own code: values, layout, diff, merge (Rust) and studio/ (Luau)
+plugin/         the plugin's shared parts: the link, the widget, packing every tool's studio/   (Luau)
+```
+
+**Logic lives in Rust wherever it can.** Rust is tested in CI, and Studio can't be. The plugin reads, writes,
+watches, drops echoes and shows the widget. The CLI owns:
+- the layout, names and escaping;
+- the value forms;
+- the diff;
+- the three-way merge and the clash list.
+
+**Tests:**
+- Rust: unit tests and round-trip tests in CI, on Windows and Linux. Fixtures are small trees made for the tests,
+  never data from a game (game data is private).
+- Luau: `stylua`, `selene` and `luau-lsp` run in CI.
+- The plugin's behaviour, and the round trip on a real place, run in Studio through the MCP, after looking at the
+  screen. That's the probe-style check from decision 0011, and it can't run in CI.
+
+**Steps, in order.** Each is an issue on the board; a step starts only when the one before it is merged.
+
+1. **The CLI's base and CI (#31):**
+   - the Cargo workspace and the `forge` binary;
+   - reading a game's `forge.toml` (place id, which trees go where);
+   - config defaults (port, quiet times, poll interval);
+   - a CI workflow for format, lint and tests.
+2. **Values and the layout, without Studio (#32):**
+   - how each Roblox value type is written in TOML, documented in `docs/sync/format.md`;
+   - floats in their shortest exact form, with `inf` and `nan`;
+   - a tree turned into layout C and read back: names with `~2` and `%XX`, `@path` references, promotion of a leaf to
+     a folder, and a MeshPart's `.rbxm`;
+   - each file written whole, in one fixed form.
+3. **The link (#33):**
+   - `forge serve`, started by any command that needs it;
+   - the plugin's WebSocket client, which reconnects quietly and never prompts or blocks Studio;
+   - `forge plugin install`, which packs the `.rbxmx`;
+   - `forge status`, which lists connected Studios;
+   - the Luau checks in CI.
+4. **Pull (#34):**
+   - the plugin reads each tree: saved properties through `ReflectionService` plus the twin list, script text through
+     `ScriptEditorService`, and each MeshPart as a model file, with a timeout;
+   - `forge sync pull` writes it to disk.
+5. **The drafts warning (#20):** pull and `forge sync status` list scripts with an uncommitted draft. Diff and push
+   (steps 6 and 7) show the same warning when they're built.
+6. **Diff (#35):** `forge sync diff` lists added, removed, moved and renamed instances, and changed properties with their
+   old and new values.
+7. **Push, with the widget's confirm (#36):**
+   - the plugin's widget, its look picked from rendered options;
+   - the plan shown in the widget, applied on Apply;
+   - a backup in `.forge/backup/<time>/`;
+   - one undo step;
+   - references set after every instance exists, and MeshParts started from their model files.
+8. **The round-trip check (#37):** `forge sync check` pulls a tree, pushes it into a scratch copy, pulls that, and compares
+   them value by value (decision 0011).
+9. **Watch, Studio to disk (#38):**
+   - the plugin's events and script poll, merged per frame and sent when quiet;
+   - echoes dropped by value;
+   - the files written.
+10. **Watch, disk to Studio, and clashes (#39):**
+    - folder watching with a quiet period, and hashes;
+    - the three-way merge;
+    - clashes held and listed in `forge sync status` and the widget, until a side is picked.
+11. **The MCP (#40):** `forge mcp` with tools for status, pull, diff, push (proposes only), check and clashes.
+12. **The guide, the skill and v0.1.0 (#41):**
+    - `docs/sync/` says what sync reads, writes and never touches;
+    - `.agents/skills/sync` tells agents when and how to use it;
+    - the first release, with binaries.
+
+Each step also updates `docs/sync/` with what it adds, so the guide is never behind.
 
 ## Afterwards (issues, not now)
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The build plan for `forge sync`: twelve PR-sized steps, with the plugin and its link before pull. The CLI and MCP
+  are Rust, after comparing Node, Python and Luau through Lune (#30, decision 0014). One `forge serve` per PC holds
+  the plugin's link, forge packs its own plugin, and a push applies only after Apply is clicked in Studio (#30,
+  decision 0015)
+
 - Probe 7 settles live sync. Studio changes are merged per frame and sent once an instance is quiet; disk changes
   are read as one batch. Echoes are dropped by comparing values, because Studio delivers its events late. A clash on
   the same property is held until a side is picked (#14, decision 0013)
