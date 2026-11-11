@@ -15,3 +15,4 @@ A decision is changed by a new record that replaces the old one, never by editin
 | [0008](0008-layout-folders-where-needed.md) | Disk layout: folders only where there are children | 2026-11-11 |
 | [0009](0009-studio-only-features.md) | Studio-only features: what a tool can reach (drafts, lint, debugger, assets) | 2026-11-11 |
 | [0010](0010-property-files-toml.md) | Property files are TOML, after comparing JSON, JSONC and YAML | 2026-11-11 |
+| [0011](0011-round-trip.md) | Round trip is exact; MeshParts start from a small model file | 2026-11-11 |

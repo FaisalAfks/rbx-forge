@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe 4 shows the round trip Studio → disk → Studio is exact for GUI, map parts, scripts, attributes, tags and
+  references. Floats are written at full precision, and MeshParts start from a small `.rbxm`, since their collision
+  data can't be read and a rebuilt part came back up to 16% lighter (#6, decision 0011)
+
 - Probe 9 keeps TOML for property files after comparing JSON, JSONC and YAML on real data: the smallest files, no
   comma noise, and every value read back exactly, where YAML read rig numbers like `-1e-06` back as text (#25,
   decision 0010)
