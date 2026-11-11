@@ -16,11 +16,12 @@ What's built next and why is in [docs/plan.md](../docs/plan.md); why things are 
 | Path | What |
 |---|---|
 | `forge/` | the `forge` binary (Rust): commands, settings (`defaults.toml`), a game's `forge.toml` |
-| `docs/` | the plan, decisions, `forge-toml.md`, and later a guide per tool |
+| `tools/sync/` | sync's own code (Rust): values, schema, the instance tree, layout C on disk |
+| `docs/` | the plan, decisions, `forge-toml.md`, `sync/format.md` (the disk format), and later a guide per tool |
 | `scripts/` | dev helpers (`setup-dev.ps1`) |
 | `.agents/` | this file and `skills/`: step-by-step how-tos (new task, probe, review, release) |
 
-`mcp/`, `plugin/` and `tools/<name>/` come with their first code, in the order of `docs/plan.md`.
+`mcp/` and `plugin/` come with their first code, in the order of `docs/plan.md`.
 
 ## Commands
 
