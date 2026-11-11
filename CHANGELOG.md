@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe 2 settles identity: forge writes nothing into the game. The plugin follows instances live through Studio's
+  events, the disk path is an instance's identity, and references are written as paths. `UniqueId` can't be read by
+  plugins and changes on every copy (#4, decision 0007)
+
 - Probe 1 picks how Studio reads the tree: a Luau walk over saved properties with script text from
   `ScriptEditorService`. Roblox's binary export exported 55 of 110 scripts stale or empty, so it's kept only as a
   fallback for data Luau can't reach (#3, decision 0006)
