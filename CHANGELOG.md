@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- AGENTS.md has agents call the Studio MCP's `list_skills` before a job instead of a fixed table of Roblox
+  skills, which went from 7 to 17 in one Studio update (#10, decision 0004)
 - No GEMINI.md: Antigravity reads `.agents/AGENTS.md` and `.agents/skills/` itself, and AGENTS.md lists which of
   Roblox's MCP skills to load for which job (#8, decision 0003)
 - The repo's setup (#1): rules in `.agents/`, issue forms that put issues on the board, the `pr-rules` check, a

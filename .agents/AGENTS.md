@@ -71,17 +71,9 @@ powershell -File scripts/setup-dev.ps1   # once per clone: the .claude/skills li
 
 **Studio and the owner's PC**
 - Agents work in Studio through its built-in MCP. One Studio per agent (`studio_id`), never two agents on one Studio.
-- Roblox's own skills come only through the MCP's `skill` tool. Load the one that fits before starting the job:
-
-  | Job | Roblox skill |
-  |---|---|
-  | engine API or how-to questions | `rbx-docs-search` |
-  | a script bug | `rbx-debug` |
-  | unit tests for a ModuleScript | `rbx-unit-test` |
-  | frame time, CPU, GPU | `rbx-perf-profiling` |
-  | memory, scene size, leaks | `rbx-scene-analysis` |
-  | UI on other devices | `rbx-device-simulator-lua` |
-  | Open Cloud, permissions, importing a model | `rbx-open-cloud-usage`, `rbx-permissions`, `rbx-import-asset` (when the MCP lists them) |
+- Roblox's own skills come only through the MCP. Before a job in Studio, call `list_skills` and load (`skill`) every
+  one whose description covers the job. Roblox adds and changes them with Studio updates, so the list is never copied
+  here ([decision 0004](../docs/decisions/0004-list-skills.md)).
 - Look at the screen before any live action (clicks, keys, starting or stopping Studio or a playtest). If the owner
   might be using the PC, or the state isn't what was left, ask.
 - A push into Studio never runs without a shown plan and the owner's OK, and keeps a backup of what it replaced.
