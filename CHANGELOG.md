@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe #45 finds that a plugin can capture Studio's viewport itself (`CaptureService`, then `EditableImage` for the
+  pixels) in 0.6 s, and that a frame with a `UIScale` lays UI out as on any screen size. `forge ui shot` follows as
+  #47. Capturing during a playtest wasn't tested and is probe #48 (decision 0016)
+
 - The `forge` binary's first code (#31). `forge config` reads forge's per-PC settings and a game's `forge.toml`
   (the place id, and which parts of the place go to which folders). A bad file gives an error that names the
   problem. Settings default from `forge/defaults.toml`. A Rust workflow checks formatting, lint and tests on Windows
