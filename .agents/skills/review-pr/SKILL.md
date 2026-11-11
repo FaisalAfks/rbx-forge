@@ -10,7 +10,7 @@ Check, in this order:
 1. **Checks are green**, and they actually ran.
 2. **One task:** the PR closes its issue and does only that; nothing unrelated slipped in.
 3. **A toolbox:** nothing in a tool knows about one game; it works from the CLI and the MCP; its doc says what it
-   reads, writes and never touches; scripts are left to Script Sync.
+   reads, writes and never touches; script text goes through `ScriptEditorService`.
 4. **Safety:** a push into Studio shows its plan and waits for an OK, and keeps a backup.
 5. **Readable code:** a file summary, small functions, names that say what things are, comments that say why.
 6. **Docs:** the changelog line is there; docs match the change; a decision record exists if the change sets a rule.

@@ -1,6 +1,6 @@
 # 0002 Built on Studio, its MCP and Script Sync; no Rojo, Argon or RbxSync
 
-Accepted, 2026-11-11.
+Accepted, 2026-11-11. Its Script Sync part is replaced by [0005](0005-sync-covers-code.md).
 
 ## Context
 
