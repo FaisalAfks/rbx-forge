@@ -84,7 +84,8 @@ Each is an issue on the board and ends in a decision record.
    **Answered by decision 0012:** forge's plugin holds a WebSocket to the CLI; the MCP path caps results at 100 KB.
 6. ~~Script Sync for code~~: dropped by decision 0005.
 7. **Live changes:** catching changes on each side as they happen (Studio's change events, file watching), without
-   loops, and what happens when both sides change the same instance.
+   loops, and what happens when both sides change the same instance. **Answered by decision 0013:** changes are merged
+   per frame, echoes are dropped by comparing values, and a clash on one property is held until a side is picked.
 
 8. **Studio-only features:** which of Studio's windows (drafts, Script Analysis, the debugger, the Asset Manager) a
    tool can reach. **Answered by decision 0009;** the tools it suggests are issues #20 to #23.
