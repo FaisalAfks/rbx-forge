@@ -12,3 +12,4 @@ A decision is changed by a new record that replaces the old one, never by editin
 | [0005](0005-sync-covers-code.md) | `forge sync` covers code too; Script Sync is dropped | 2026-11-11 |
 | [0006](0006-read-with-luau.md) | Studio reads the tree with Luau (candidate A); model data only where Luau can't reach | 2026-11-11 |
 | [0007](0007-identity-outside-the-game.md) | Identity is kept outside the game: live objects in Studio, paths on disk | 2026-11-11 |
+| [0008](0008-layout-folders-where-needed.md) | Disk layout: folders only where there are children | 2026-11-11 |
