@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe 5 picks the link between the CLI and Studio: a WebSocket from forge's plugin to the CLI on localhost, about
+  one frame per round trip and 16 MB messages without trouble. Studio's MCP was ruled out as the transport because it
+  cuts results at about 100 KB and can't send events (#7, decision 0012)
+
 - Probe 4 shows the round trip Studio → disk → Studio is exact for GUI, map parts, scripts, attributes, tags and
   references. Floats are written at full precision, and MeshParts start from a small `.rbxm`, since their collision
   data can't be read and a rebuilt part came back up to 16% lighter (#6, decision 0011)

@@ -81,6 +81,7 @@ Each is an issue on the board and ends in a decision record.
    **Answered by decision 0011:** exact, with floats at full precision and MeshParts starting from a small `.rbxm`.
 5. **The link:** how the CLI and Studio talk. A plugin with a WebSocket or HTTP to `localhost`, against the CLI calling
    Studio's MCP server itself. What each needs (permissions, Studio settings), and its speed and size limits.
+   **Answered by decision 0012:** forge's plugin holds a WebSocket to the CLI; the MCP path caps results at 100 KB.
 6. ~~Script Sync for code~~: dropped by decision 0005.
 7. **Live changes:** catching changes on each side as they happen (Studio's change events, file watching), without
    loops, and what happens when both sides change the same instance.
