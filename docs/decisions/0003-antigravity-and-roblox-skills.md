@@ -1,6 +1,7 @@
 # 0003 Antigravity reads `.agents/` itself; Roblox's skills come through the MCP
 
-Accepted, 2026-11-11. Replaces the `GEMINI.md` part of 0001 (reversed 2026-11-11, was "a one-line `GEMINI.md` for
+Accepted, 2026-11-11. Its skill table is replaced by [0004](0004-list-skills.md).
+Replaces the `GEMINI.md` part of 0001 (reversed 2026-11-11, was "a one-line `GEMINI.md` for
 Gemini CLI and Antigravity").
 
 ## Context
