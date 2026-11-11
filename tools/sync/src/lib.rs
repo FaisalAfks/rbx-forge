@@ -1,0 +1,10 @@
+//! forge sync's own code (docs/plan.md): Roblox values and their written forms, the schema that types them, the
+//! instance tree, and layout C on disk. Studio, the link and the commands build on these.
+
+pub mod layout;
+pub mod names;
+pub mod number;
+pub mod schema;
+pub mod text;
+pub mod tree;
+pub mod value;

@@ -1,0 +1,16 @@
+[package]
+name = "forge-sync"
+description = "forge sync's own code: Roblox values, the disk layout, and later diff and merge"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["float_roundtrip"] }  # exact float parsing (decision 0014)
+toml = "1.2.1"
+
+[lints]
+workspace = true

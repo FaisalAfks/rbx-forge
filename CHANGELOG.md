@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Sync's disk format, without Studio yet (#32). Every type Studio saves and Luau can read has a written form in
+  `docs/sync/format.md`, with numbers that keep every bit and colours as `#rrggbb` only when exact. A tree turns into
+  layout C and back:
+  - names are safe on Windows and never clash with properties or forge's own files;
+  - repeats get `~2`, and names read from disk are kept, so one change is one line;
+  - references are paths;
+  - script text keeps its exact bytes.
+  JSON numbers are now parsed exactly (`serde_json`'s `float_roundtrip`), after a test caught Studio's 17-digit
+  output reading back one bit off
+
 - Probe #46 shows that forge can build a place without Studio. Model files written in Rust with rbx-dom loaded into
   Studio identical to the originals: 180 instances and 8,133 property reads, 0 differences. The Studio command line
   can't save a place and needs a login, so it isn't used for builds. `forge build` follows as #50 (decision 0017)
