@@ -52,8 +52,8 @@ powershell -File scripts/setup-dev.ps1   # once per clone: the .claude/skills li
 - A tool never knows about one game. Game-specific settings live in the game's repo (a `forge.toml`).
 - Every tool works from the CLI, from the MCP, and from Studio when it has a Studio side.
 - Each tool's doc says what it reads, what it writes, and what it never touches.
-- Script text is read and written only through `ScriptEditorService`; `Script.Source` can be empty when the editor
-  isn't (decision 0005).
+- Script text is read and written only through `ScriptEditorService`. With collaborative editing, `Script.Source` is
+  the last committed copy and can be old or empty while a draft is open (decisions 0005, 0009).
 
 **How work is done**
 - Research before building: check how Studio, a library or an API really behaves (its docs, a probe) before building
