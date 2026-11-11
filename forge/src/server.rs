@@ -44,15 +44,23 @@ type Shared = Arc<Mutex<State>>;
 /// Where the log goes when it isn't standard error: set once, when the server starts.
 static LOG: OnceLock<Mutex<std::fs::File>> = OnceLock::new();
 
-/// Runs the server until a command sends `stop`. With `log`, its lines go to that file (overwritten, so it holds
-/// this server's lines only) instead of standard error.
+/// Runs the server until a command sends `stop`. With `log`, its lines go to that file instead of standard error.
+/// The file is overwritten once the port is taken, so it holds the running server's lines only; a server that can't
+/// take the port adds its reason at the end instead, leaving the running server's lines in place.
 pub async fn run(port: u16, log_to: Option<&Path>) -> Result<()> {
+    let bound = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await;
     if let Some(path) = log_to {
-        let file = std::fs::File::create(path)
+        let mut options = std::fs::OpenOptions::new();
+        match bound {
+            Ok(_) => options.write(true).create(true).truncate(true),
+            Err(_) => options.append(true).create(true),
+        };
+        let file = options
+            .open(path)
             .with_context(|| format!("can't write {}", path.display()))?;
         let _ = LOG.set(Mutex::new(file));
     }
-    let listener = match TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await {
+    let listener = match bound {
         Ok(listener) => listener,
         Err(err) => {
             let message = format!(

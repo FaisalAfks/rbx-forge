@@ -194,6 +194,14 @@ fn a_second_server_on_the_same_port_says_why_it_cant_start() {
     let out = server.forge(&["serve"], &server.dir);
     assert!(!out.status.success());
     assert!(text(&out).contains("already running"), "{}", text(&out));
+
+    // Started in the background, the second server adds its reason to the log and leaves the running one's lines.
+    let log = server.dir.join("serve.log");
+    let out = server.forge(&["serve", "--log", log.to_str().unwrap()], &server.dir);
+    assert!(!out.status.success());
+    let lines = std::fs::read_to_string(&log).unwrap();
+    assert!(lines.starts_with("forge serve "), "{lines}");
+    assert!(lines.contains("can't listen"), "{lines}");
 }
 
 #[test]
