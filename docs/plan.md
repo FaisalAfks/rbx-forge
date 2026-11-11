@@ -40,7 +40,8 @@ Rules that keep it a toolbox, not a game:
 - **`forge sync watch`:** keeps both sides in step while Studio is open, once probe 7 says how.
 - **`forge.toml`** in the game's repo says which parts are synced and where they go on disk.
 
-**How it could work** (two candidates; probes 1, 2 and 4 pick one):
+**How it could work** (two candidates; probe 1 picked A, with B only as a fallback for data Luau can't reach,
+decision 0006):
 
 - **A. Studio writes the readable form itself.** The plugin walks the tree, lists each class's saved properties with
   `ReflectionService`, reads script text with `ScriptEditorService`, and sends plain JSON and Luau. The CLI only writes
@@ -51,7 +52,8 @@ Rules that keep it a toolbox, not a game:
   other tools, so the reader is pinned and round-trip tests run on every release.
 
 What's settled either way:
-- Script text goes through `ScriptEditorService` (`Script.Source` came back empty for 26 of 145 scripts).
+- Script text goes through `ScriptEditorService` (`Script.Source` came back empty for 26 of 145 scripts, and stale
+  for more; decision 0006).
 - Studio changes are recorded with `ChangeHistoryService`, so a push is one undo step.
 - The design doesn't copy Rojo or Argon. Where one of their ideas is used, it's because it's the only good option,
   and its decision record says so.
@@ -65,10 +67,11 @@ What's settled either way:
 Each is an issue on the board and ends in a decision record.
 
 1. **Studio side:** how fast and how big are candidate A's walk and candidate B's `SerializeInstancesAsync` on a real
-   screen, a real map and the game's code, run through the MCP's `execute_luau` and from a plugin?
-2. **Disk side and identity:** for candidate B, do Lune and rbx-dom read the model data back with every property,
-   attribute and tag? For both, how does forge know an instance after a rename or a move: `UniqueId` in the model data
-   (plugins can't read it), or an id of forge's own?
+   screen, a real map and the game's code, run through the MCP's `execute_luau` and from a plugin? **Answered by
+   decision 0006:** A; B loses script text and is kept only as a fallback.
+2. **Identity:** how does forge know an instance after a rename or a move, and how are references written: `UniqueId`
+   in the model data (plugins can't read it), or an id of forge's own? (The Lune and rbx-dom half was dropped by
+   decision 0006.)
 3. **Readable layout:** how nested instances and scripts look on disk. At least two layouts compared on the HUD, the
    arena and a code folder: size, readability, and the diff after a colour change, a moved frame, an added button, a
    renamed script and a script moved under a part.
