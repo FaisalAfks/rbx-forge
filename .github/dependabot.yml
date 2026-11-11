@@ -1,4 +1,4 @@
-# Keeps GitHub Actions up to date: one grouped PR a week.
+# Keeps GitHub Actions and Rust crates up to date: one grouped PR a week for each.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -7,3 +7,9 @@ updates:
     labels: ["type: chore", "skip-notes"]
     groups:
       actions: { patterns: ["*"] }
+  - package-ecosystem: cargo
+    directory: /
+    schedule: { interval: weekly }
+    labels: ["type: chore", "skip-notes"]
+    groups:
+      crates: { patterns: ["*"] }

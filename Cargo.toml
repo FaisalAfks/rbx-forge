@@ -1,0 +1,15 @@
+# The Rust workspace: the forge binary now; mcp/ and tools/<name>/ join it with their first code (docs/plan.md).
+[workspace]
+members = ["forge"]
+resolver = "3"
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+repository = "https://github.com/FaisalAfks/rbx-forge"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

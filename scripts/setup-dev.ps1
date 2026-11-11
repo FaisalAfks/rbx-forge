@@ -21,4 +21,9 @@ if (Get-Command uvx -ErrorAction SilentlyContinue) {
     Write-Host "uv is needed for the pre-commit hooks: winget install astral-sh.uv" -ForegroundColor Yellow
 }
 
+# forge is Rust (docs/decisions/0014); rust-toolchain.toml picks the version on the first build
+if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
+    Write-Host "Rust is needed to build forge: winget install Rustlang.Rustup" -ForegroundColor Yellow
+}
+
 Write-Host "ready"

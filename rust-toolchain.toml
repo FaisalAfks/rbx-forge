@@ -1,0 +1,4 @@
+# The Rust version for local builds and CI, so both build with the same compiler.
+[toolchain]
+channel = "1.99"
+components = ["rustfmt", "clippy"]

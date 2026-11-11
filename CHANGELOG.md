@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The `forge` binary's first code (#31). `forge config` reads forge's per-PC settings and a game's `forge.toml`
+  (the place id, and which parts of the place go to which folders). A bad file gives an error that names the
+  problem. Settings default from `forge/defaults.toml`. A Rust workflow checks formatting, lint and tests on Windows
+  and Linux, and Dependabot keeps the crates current
+
 - The build plan for `forge sync`: twelve PR-sized steps, with the plugin and its link before pull. The CLI and MCP
   are Rust, after comparing Node, Python and Luau through Lune (#30, decision 0014). One `forge serve` per PC holds
   the plugin's link, forge packs its own plugin, and a push applies only after Apply is clicked in Studio (#30,

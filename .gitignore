@@ -3,3 +3,5 @@
 # a push's backups and other local state
 .forge/
 .vscode/
+# Rust build output
+/target/
