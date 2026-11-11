@@ -10,3 +10,4 @@ A decision is changed by a new record that replaces the old one, never by editin
 | [0003](0003-antigravity-and-roblox-skills.md) | Antigravity reads `.agents/` itself; Roblox's skills come through the MCP (skill table replaced by 0004) | 2026-11-11 |
 | [0004](0004-list-skills.md) | Find Roblox's skills with `list_skills`, not a table in AGENTS.md | 2026-11-11 |
 | [0005](0005-sync-covers-code.md) | `forge sync` covers code too; Script Sync is dropped | 2026-11-11 |
+| [0006](0006-read-with-luau.md) | Studio reads the tree with Luau (candidate A); model data only where Luau can't reach | 2026-11-11 |
