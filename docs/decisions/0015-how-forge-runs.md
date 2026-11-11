@@ -45,8 +45,10 @@ a fork in the road.
   widget, with Apply and Cancel. Nothing changes until Apply is clicked.
 - The CLI waits and prints the result. The MCP's push tool returns the plan and the result, and can't apply on its
   own.
-- Against a yes/no prompt in the terminal: an agent running the CLI can answer that prompt itself. A click in Studio
-  is the owner's, since agents never click on the owner's PC without the owner's word.
+- Against a yes/no prompt in the terminal: an agent running the CLI can answer that prompt by passing `y` in, and
+  nobody sees it happen. An agent could click in Studio too (the Studio MCP has mouse and keyboard tools). But
+  clicking is live input on the owner's PC, which agents only do with the owner's word, and a click in Studio's
+  window happens where the owner can see it. The click is a deliberate step; a `y` passed in isn't.
 - How the widget looks is picked from rendered options in the push step, like any UI.
 
 **4. Property files are written whole, in one fixed form.**

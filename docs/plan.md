@@ -145,7 +145,8 @@ watches, drops echoes and shows the widget. The CLI owns:
    - the plugin reads each tree: saved properties through `ReflectionService` plus the twin list, script text through
      `ScriptEditorService`, and each MeshPart as a model file, with a timeout;
    - `forge sync pull` writes it to disk.
-5. **The drafts warning (#20):** pull and diff warn when a script has an uncommitted draft.
+5. **The drafts warning (#20):** pull and `forge sync status` list scripts with an uncommitted draft. Diff and push
+   (steps 6 and 7) show the same warning when they're built.
 6. **Diff (#35):** `forge sync diff` lists added, removed, moved and renamed instances, and changed properties with their
    old and new values.
 7. **Push, with the widget's confirm (#36):**

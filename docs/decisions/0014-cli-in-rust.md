@@ -20,25 +20,28 @@ On this PC (Windows 11):
 - start-up time of a program that reads one property file, median of 10 runs;
 - whether each language's float output reads back bit for bit (the TOML part checked with Rust's `toml_edit` and
   Python's `tomllib`);
-- one `execute_luau` call to check what Studio itself sends: `HttpService:JSONEncode` on infinity, NaN, `-0` and 2,708
-  real and random numbers, read back with a correct JSON parser (Python's).
+- `execute_luau` calls to check what Studio itself sends: `HttpService:JSONEncode` on infinity, NaN, `-0`, 2,708 real
+  and random numbers, and 10,600 sums of decimals like `0.1 + 0.2`, each read back with a correct parser (Python's).
+
+Cells marked *docs* come from the library's documentation, not a test here. Lune isn't installed on this PC.
 
 | | Rust 1.99 | Node 24 (TypeScript) | Python 3.14 | Luau (Lune) |
 |---|---|---|---|---|
 | Start-up | **9 ms** | 49 ms | 166 ms, before any libraries | not installed |
-| Floats read back exactly | yes (`-0.0` kept) | **no**: `String(-0)` is `"0"`, so `-0` needs special code | yes | yes |
-| Shortest float text | needs a formatter: `toml_edit` wrote `5e-324` as 320 digits (exact but unreadable) | yes | yes | yes |
-| File watching | `notify` crate | `fs.watch`, recursive on Windows | `watchdog` (tested in probe 7) | **none**: Lune's `fs` has no watch function |
-| WebSocket server | `tokio-tungstenite` | `ws` | `websockets` | `net.serve` |
-| MCP SDK | `rmcp`, the official Rust SDK | the reference SDK | the official SDK | none |
-| TOML that keeps comments and layout when edited | `toml_edit` | no solid choice | `tomlkit` (slow) | no |
+| Floats read back exactly | yes (`-0.0` kept) | **no**: `String(-0)` is `"0"`, so `-0` needs special code | yes | not tested |
+| Shortest float text | needs a formatter: `toml_edit` wrote `5e-324` as 320 digits (exact but unreadable) | yes | yes | not tested |
+| File watching | `notify` crate (*docs*) | `fs.watch`, recursive on Windows (*docs*) | `watchdog` (tested in probe 7) | **none**: Lune's `fs` has no watch function (*docs*) |
+| WebSocket server | `tokio-tungstenite` (*docs*) | `ws` (*docs*) | `websockets` (*docs*) | `net.serve` (*docs*) |
+| MCP SDK | `rmcp`, the official Rust SDK (*docs*) | the reference SDK (*docs*) | the official SDK (*docs*) | none (*docs*) |
+| TOML that keeps comments and layout when edited | `toml_edit` (*docs*) | not checked | `tomlkit` (*docs*) | not checked |
 | Installing | one `.exe`, no runtime | Node and `npm` | Python and `uv` | the Lune binary |
 | Same language as the plugin | no | no | no | **yes** |
 
 What Studio sends:
 - `JSONEncode` writes 17 digits, with an odd last digit (`0.1 + 0.2` comes out as `0.30000000000000007`, where
-  `tostring` gives `0.30000000000000004`). It's still exact: a correct parser read all 2,708 numbers back as the same
-  value.
+  `tostring` gives `0.30000000000000004`). 1,348 of the 10,600 decimal sums looked off like that. It's still exact:
+  the odd digit stays within half a step of the true value, so a correct parser read every one of the 13,308 numbers
+  back as the same value.
 - Infinity and NaN come out as a wrapped object (`{"t":"numeric","v":"inf"}`), not a number. That shape isn't
   documented, so the plugin writes them itself.
 - `-0` comes through as `-0`.
