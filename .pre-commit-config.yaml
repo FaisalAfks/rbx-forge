@@ -1,0 +1,10 @@
+# Checks run before each commit: scripts/setup-dev.ps1 installs them once per clone.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-toml
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: no-commit-to-branch  # never commit on main: a branch and a PR

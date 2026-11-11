@@ -1,0 +1,21 @@
+name: Probe
+description: A question answered by a test before anything is built on it
+labels: ["type: probe"]
+projects: ["FaisalAfks/2"]
+body:
+  - type: dropdown
+    id: tool
+    attributes: { label: Tool, options: ["sync", "repo", "a new tool"] }
+    validations: { required: true }
+  - type: textarea
+    id: question
+    attributes: { label: The question, description: "What has to be known, in one or two lines." }
+    validations: { required: true }
+  - type: textarea
+    id: how
+    attributes: { label: How it's tested, description: "On what (which place, which parts), with what, and what's measured." }
+    validations: { required: true }
+  - type: textarea
+    id: done
+    attributes: { label: Done when, description: "The answer, with its evidence, is in a decision record." }
+    validations: { required: true }

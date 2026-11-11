@@ -1,0 +1,17 @@
+name: Task
+description: A planned piece of work or a chore
+labels: ["type: task"]
+projects: ["FaisalAfks/2"]
+body:
+  - type: dropdown
+    id: tool
+    attributes: { label: Tool, options: ["sync", "repo"] }
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes: { label: What to do }
+    validations: { required: true }
+  - type: textarea
+    id: done
+    attributes: { label: Done when }
+    validations: { required: true }
