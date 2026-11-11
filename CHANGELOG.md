@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- forge's link to Studio (#33, `docs/link.md`):
+  - `forge serve`, one per PC on 127.0.0.1, which any command that needs it starts in the background;
+  - forge's plugin, which connects from Studio's edit session, tries again quietly when the server isn't there, and
+    never prompts;
+  - `forge status`, which lists linked Studios with their game repos;
+  - `forge stop`;
+  - `forge plugin install`, which packs `plugin/` and each tool's `studio/` into `forge.rbxmx`, with the plugin's
+    settings as attributes.
+  On Windows the server is started through WMI, so it doesn't hold the starting command's output pipes and a script
+  reading that output isn't left waiting. A Luau workflow runs StyLua, selene and luau-lsp on the plugin, with the
+  tools pinned in `rokit.toml`
+
 - Sync's disk format, without Studio yet (#32). Every type Studio saves and Luau can read has a written form in
   `docs/sync/format.md`, with numbers that keep every bit and colours as `#rrggbb` only when exact. A tree turns into
   layout C and back:
