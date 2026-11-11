@@ -1,0 +1,2 @@
+# Lints for the plugin's Luau (CI runs selene). `roblox` knows Studio's globals, `plugin` included.
+std = "roblox"

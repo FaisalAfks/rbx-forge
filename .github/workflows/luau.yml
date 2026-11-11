@@ -1,0 +1,38 @@
+# Format, lint and type checks for the plugin's Luau (plugin/ and every tools/<name>/studio/). The tools are pinned in
+# rokit.toml. luau-lsp needs a sourcemap to follow `require(script.x)`, which forge writes from the same layout it
+# packs, and Roblox's types for plugins, pinned to the luau-lsp release.
+name: Luau
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  LUAU_LSP_VERSION: 1.70.1
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+      - uses: CompeyDev/setup-rokit@v0.2.1
+      - name: Format
+        run: stylua --check plugin tools
+      # Each check runs even when one before it fails, so one run reports every problem.
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: selene plugin tools
+      - name: Types
+        if: ${{ !cancelled() }}
+        run: |
+          cargo run --quiet --locked -- plugin sourcemap > sourcemap.json
+          curl --fail --silent --show-error --location --output globalTypes.d.luau \
+            "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LUAU_LSP_VERSION}/scripts/globalTypes.PluginSecurity.d.luau"
+          luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=globalTypes.d.luau plugin

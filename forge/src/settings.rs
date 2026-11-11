@@ -13,6 +13,7 @@ const DEFAULTS: &str = include_str!("../defaults.toml");
 #[serde(deny_unknown_fields)]
 pub struct Settings {
     pub server: Server,
+    pub plugin: Plugin,
     pub watch: Watch,
 }
 
@@ -20,6 +21,14 @@ pub struct Settings {
 #[serde(deny_unknown_fields)]
 pub struct Server {
     pub port: u16,
+    pub start_timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Plugin {
+    pub retry_ms: u64,
+    pub open_timeout_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -30,8 +39,15 @@ pub struct Watch {
     pub script_poll_ms: u64,
 }
 
-/// Where the per-PC settings file lives (on Windows, `%APPDATA%\forge\settings.toml`).
+/// Names a settings file to use instead of the usual one. Tests use it to run their own server on their own port, and
+/// a server that a command starts inherits it.
+pub const FILE_VAR: &str = "FORGE_SETTINGS";
+
+/// Where the per-PC settings file lives: `FORGE_SETTINGS` if set, else (on Windows) `%APPDATA%\forge\settings.toml`.
 pub fn user_file() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os(FILE_VAR).filter(|p| !p.is_empty()) {
+        return Some(PathBuf::from(path));
+    }
     dirs::config_dir().map(|dir| dir.join("forge").join("settings.toml"))
 }
 

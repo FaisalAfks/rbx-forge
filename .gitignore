@@ -5,3 +5,7 @@
 .vscode/
 # Rust build output
 /target/
+# luau-lsp reads this; `forge plugin sourcemap` writes it
+sourcemap.json
+# the Roblox types luau-lsp checks against, downloaded by CI
+globalTypes*.d.luau

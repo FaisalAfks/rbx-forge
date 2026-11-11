@@ -15,13 +15,14 @@ What's built next and why is in [docs/plan.md](../docs/plan.md); why things are 
 
 | Path | What |
 |---|---|
-| `forge/` | the `forge` binary (Rust): commands, settings (`defaults.toml`), a game's `forge.toml` |
+| `forge/` | the `forge` binary (Rust): commands, settings (`defaults.toml`), a game's `forge.toml`, `forge serve` and packing the plugin |
+| `plugin/` | forge's Studio plugin (Luau): the link to `forge serve`; each tool's Studio side is in `tools/<name>/studio/` |
 | `tools/sync/` | sync's own code (Rust): values, schema, the instance tree, layout C on disk |
-| `docs/` | the plan, decisions, `forge-toml.md`, `sync/format.md` (the disk format), and later a guide per tool |
+| `docs/` | the plan, decisions, `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/format.md` (the disk format), and later a guide per tool |
 | `scripts/` | dev helpers (`setup-dev.ps1`) |
 | `.agents/` | this file and `skills/`: step-by-step how-tos (new task, probe, review, release) |
 
-`mcp/` and `plugin/` come with their first code, in the order of `docs/plan.md`.
+`mcp/` comes with its first code, in the order of `docs/plan.md`.
 
 ## Commands
 
@@ -31,6 +32,11 @@ cargo fmt --all                          # format the Rust code (CI fails on unf
 cargo clippy --all-targets -- -D warnings   # lint, as CI does
 cargo test                               # unit and command tests, as CI does
 cargo run -- config                      # forge's settings and the nearest forge.toml
+cargo run -- status                      # forge serve (started if needed) and the Studios linked to it
+cargo run -- plugin install              # pack plugin/ into forge.rbxmx in Studio's Plugins folder
+cargo run -- stop                        # stop forge serve (a running one locks target/debug/forge.exe)
+rokit install                            # the Luau tools (rokit.toml); then, as CI does:
+stylua --check plugin tools && selene plugin tools
 ```
 
 ## Rules
