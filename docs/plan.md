@@ -75,7 +75,8 @@ Each is an issue on the board and ends in a decision record.
    the disk path is the identity, and references are written as paths.
 3. **Readable layout:** how nested instances and scripts look on disk, with every path unique (siblings can share a
    name) and references written as paths. At least two layouts compared on the HUD, the arena and a code folder: size, readability, and the diff after a colour change, a moved frame, an added button, a
-   renamed script and a script moved under a part.
+   renamed script and a script moved under a part. **Answered by decision 0008:** folders only for instances with
+   children; leaf children are sections in the folder's `_.toml`; scripts are `.luau` files.
 4. **Round trip:** Studio → disk → Studio, compared object by object, property by property, scripts included.
 5. **The link:** how the CLI and Studio talk. A plugin with a WebSocket or HTTP to `localhost`, against the CLI calling
    Studio's MCP server itself. What each needs (permissions, Studio settings), and its speed and size limits.

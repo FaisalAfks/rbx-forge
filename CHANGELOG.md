@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe 3 picks the disk layout: a folder only for instances with children, a `_.toml` per folder holding its own
+  properties and its leaf children, and scripts as plain `.luau` files. Three layouts were compared on real data by
+  file count and git diffs (#5, decision 0008)
+
 - Probe 2 settles identity: forge writes nothing into the game. The plugin follows instances live through Studio's
   events, the disk path is an instance's identity, and references are written as paths. `UniqueId` can't be read by
   plugins and changes on every copy (#4, decision 0007)
