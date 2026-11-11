@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe 9 keeps TOML for property files after comparing JSON, JSONC and YAML on real data: the smallest files, no
+  comma noise, and every value read back exactly, where YAML read rig numbers like `-1e-06` back as text (#25,
+  decision 0010)
+
 - Probe 8 checks which Studio-only features a tool can reach. The debugger can be reached; Script Analysis can only
   take extra results; drafts and the Asset Manager can't. Stale script text comes from uncommitted drafts. Four
   tools follow as issues (#19, decision 0009)
