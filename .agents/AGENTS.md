@@ -15,16 +15,21 @@ What's built next and why is in [docs/plan.md](../docs/plan.md); why things are 
 
 | Path | What |
 |---|---|
-| `docs/` | the plan, decisions, and later a guide per tool |
+| `forge/` | the `forge` binary (Rust): commands, settings (`defaults.toml`), a game's `forge.toml` |
+| `docs/` | the plan, decisions, `forge-toml.md`, and later a guide per tool |
 | `scripts/` | dev helpers (`setup-dev.ps1`) |
 | `.agents/` | this file and `skills/`: step-by-step how-tos (new task, probe, review, release) |
 
-The tool folders (`forge/`, `mcp/`, `plugin/`, `tools/<name>/`) come with the first code, after the probes.
+`mcp/`, `plugin/` and `tools/<name>/` come with their first code, in the order of `docs/plan.md`.
 
 ## Commands
 
 ```bash
 powershell -File scripts/setup-dev.ps1   # once per clone: the .claude/skills link and the pre-commit hooks
+cargo fmt --all                          # format the Rust code (CI fails on unformatted code)
+cargo clippy --all-targets -- -D warnings   # lint, as CI does
+cargo test                               # unit and command tests, as CI does
+cargo run -- config                      # forge's settings and the nearest forge.toml
 ```
 
 ## Rules

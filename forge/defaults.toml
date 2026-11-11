@@ -1,0 +1,13 @@
+# forge's settings and their defaults. Any of them can be changed in the settings file that `forge config` names.
+
+[server]
+# The port `forge serve` listens on (127.0.0.1 only) and the plugin connects to (decision 0015).
+port = 34900
+
+[watch]
+# How long an instance in Studio must stay unchanged before its changes are sent, so a drag is one change (0013).
+studio_quiet_ms = 250
+# How long the synced folders must stay quiet before changed files are read as one batch (0013).
+disk_quiet_ms = 300
+# How often the plugin checks script text for edits that fire no event (0013).
+script_poll_ms = 1000
