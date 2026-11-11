@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Probe 7 settles live sync. Studio changes are merged per frame and sent once an instance is quiet; disk changes
+  are read as one batch. Echoes are dropped by comparing values, because Studio delivers its events late. A clash on
+  the same property is held until a side is picked (#14, decision 0013)
+
 - Probe 5 picks the link between the CLI and Studio: a WebSocket from forge's plugin to the CLI on localhost, about
   one frame per round trip and 16 MB messages without trouble. Studio's MCP was ruled out as the transport because it
   cuts results at about 100 KB and can't send events (#7, decision 0012)
