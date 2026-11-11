@@ -1,6 +1,6 @@
 # 0001 Rules in `.agents/`, with one-line CLAUDE.md and GEMINI.md
 
-Accepted, 2026-11-11.
+Accepted, 2026-11-11. The `GEMINI.md` part is replaced by [0003](0003-antigravity-and-roblox-skills.md).
 
 ## Context
 

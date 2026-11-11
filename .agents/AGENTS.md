@@ -1,7 +1,8 @@
 # AGENTS.md
 
-How to work in this repo. Read by Claude Code through `CLAUDE.md`, Gemini CLI through `GEMINI.md`, other tools when
-pointed here ([decision 0001](../docs/decisions/0001-rules-in-agents-folder.md)), and by people. Longer guides live in `docs/`; this file points to them.
+How to work in this repo. Read by Claude Code through `CLAUDE.md`, by Antigravity directly
+([decision 0003](../docs/decisions/0003-antigravity-and-roblox-skills.md)), and by people. Longer guides live in
+`docs/`; this file points to them.
 
 ## What this is
 
@@ -70,6 +71,17 @@ powershell -File scripts/setup-dev.ps1   # once per clone: the .claude/skills li
 
 **Studio and the owner's PC**
 - Agents work in Studio through its built-in MCP. One Studio per agent (`studio_id`), never two agents on one Studio.
+- Roblox's own skills come only through the MCP's `skill` tool. Load the one that fits before starting the job:
+
+  | Job | Roblox skill |
+  |---|---|
+  | engine API or how-to questions | `rbx-docs-search` |
+  | a script bug | `rbx-debug` |
+  | unit tests for a ModuleScript | `rbx-unit-test` |
+  | frame time, CPU, GPU | `rbx-perf-profiling` |
+  | memory, scene size, leaks | `rbx-scene-analysis` |
+  | UI on other devices | `rbx-device-simulator-lua` |
+  | Open Cloud, permissions, importing a model | `rbx-open-cloud-usage`, `rbx-permissions`, `rbx-import-asset` (when the MCP lists them) |
 - Look at the screen before any live action (clicks, keys, starting or stopping Studio or a playtest). If the owner
   might be using the PC, or the state isn't what was left, ask.
 - A push into Studio never runs without a shown plan and the owner's OK, and keeps a backup of what it replaced.
