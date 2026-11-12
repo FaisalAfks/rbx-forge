@@ -7,6 +7,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
+use crate::ignore::Ignore;
 use crate::layout::{self, Files};
 
 /// Tells git to keep every file in the folder byte for byte: no line-ending changes on checkout or commit, whatever
@@ -26,11 +27,11 @@ pub struct Plan {
 
 /// Works out the changes that put `files` in `folder`, and checks they're safe. `force` skips the checks for a
 /// folder forge didn't make and for uncommitted changes.
-pub fn plan(folder: &Path, files: &Files, force: bool) -> Result<Plan> {
+pub fn plan(folder: &Path, files: &Files, ignore: &Ignore, force: bool) -> Result<Plan> {
     let mut files = files.clone();
     files.insert(GITATTRIBUTES.0.into(), GITATTRIBUTES.1.as_bytes().to_vec());
     let old = if folder.is_dir() {
-        layout::read_dir(folder)?
+        layout::read_dir(folder, ignore)?
     } else {
         Files::new()
     };
@@ -196,7 +197,7 @@ mod tests {
     }
 
     fn pull(dir: &Path, f: &Files) -> Plan {
-        let p = plan(dir, f, false).unwrap();
+        let p = plan(dir, f, &Ignore::default(), false).unwrap();
         apply(dir, f, &p).unwrap();
         p
     }
@@ -236,12 +237,12 @@ mod tests {
     fn a_folder_forge_didnt_make_is_left_alone() {
         let dir = temp("foreign");
         std::fs::write(dir.join("init.luau"), "return {}").unwrap();
-        let err = plan(&dir, &files(&[("_.toml", "x")]), false)
+        let err = plan(&dir, &files(&[("_.toml", "x")]), &Ignore::default(), false)
             .unwrap_err()
             .to_string();
         assert!(err.contains("no _.toml"), "{err}");
         // Forced, pull writes over it, and a file shaped like one of its own goes.
-        let p = plan(&dir, &files(&[("_.toml", "x")]), true).unwrap();
+        let p = plan(&dir, &files(&[("_.toml", "x")]), &Ignore::default(), true).unwrap();
         assert!(
             p.remove.contains(&"init.luau".to_string()),
             "forge-shaped files are replaced when forced"
@@ -249,16 +250,32 @@ mod tests {
     }
 
     #[test]
+    fn ignored_files_are_never_read_or_removed() {
+        let dir = temp("ignored");
+        let ignore = Ignore::new(vec!["*.md".into()]).unwrap();
+        let both = files(&[("_.toml", "x"), ("A/S.luau", "print(1)")]);
+        let p = plan(&dir, &both, &ignore, false).unwrap();
+        apply(&dir, &both, &p).unwrap();
+        std::fs::write(dir.join("README.md"), "mine").unwrap();
+        std::fs::write(dir.join("A/README.md"), "mine").unwrap();
+        // A's script goes, and its folder stays for the README it still holds.
+        let p = plan(&dir, &files(&[("_.toml", "x")]), &ignore, false).unwrap();
+        assert_eq!(p.remove, ["A/S.luau"]);
+        apply(&dir, &files(&[("_.toml", "x")]), &p).unwrap();
+        assert!(dir.join("README.md").exists() && dir.join("A/README.md").exists());
+    }
+
+    #[test]
     fn a_file_forge_doesnt_write_stops_the_pull() {
         let dir = temp("stray");
         pull(&dir, &files(&[("_.toml", "x")]));
         std::fs::write(dir.join("notes.txt"), "mine").unwrap();
-        let err = plan(&dir, &files(&[("_.toml", "x")]), false)
+        let err = plan(&dir, &files(&[("_.toml", "x")]), &Ignore::default(), false)
             .unwrap_err()
             .to_string();
         assert!(err.contains("notes.txt"), "{err}");
         assert!(
-            plan(&dir, &files(&[("_.toml", "x")]), true)
+            plan(&dir, &files(&[("_.toml", "x")]), &Ignore::default(), true)
                 .unwrap()
                 .remove
                 .is_empty()
@@ -300,7 +317,7 @@ mod tests {
         std::fs::write(dir.join("README.md"), "edited").unwrap();
         std::fs::write(folder.join("A").join("S.luau"), "edited").unwrap();
         let same_script = files(&[("_.toml", "new"), ("A/_.toml", "a"), ("A/S.luau", "edited")]);
-        assert!(plan(&folder, &same_script, false).is_ok());
+        assert!(plan(&folder, &same_script, &Ignore::default(), false).is_ok());
 
         // A change to a file pull would write or remove does.
         let new = files(&[
@@ -308,12 +325,16 @@ mod tests {
             ("A/_.toml", "a"),
             ("A/S.luau", "from studio"),
         ]);
-        let err = plan(&folder, &new, false).unwrap_err().to_string();
+        let err = plan(&folder, &new, &Ignore::default(), false)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("A/S.luau"), "{err}");
         let gone = files(&[("_.toml", "new")]);
-        let err = plan(&folder, &gone, false).unwrap_err().to_string();
+        let err = plan(&folder, &gone, &Ignore::default(), false)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("A/S.luau"), "{err}");
-        assert!(plan(&folder, &new, true).is_ok());
+        assert!(plan(&folder, &new, &Ignore::default(), true).is_ok());
     }
 
     #[test]

@@ -81,7 +81,8 @@ it's held as a clash (in `forge sync status` and forge's window) until you pick:
 - **Anything outside the trees in `forge.toml`.** forge reads and writes only those.
 - **Studio, without a push you approved** (or the setting you chose). Pull, diff, status and check change nothing in
   Studio.
-- **Files forge didn't write.** A synced folder with files forge doesn't write stops a pull rather than losing them.
+- **Files forge didn't write.** A synced folder with files forge doesn't write stops a pull rather than losing them,
+  unless the tree's `ignore` names them (READMEs beside code, say), in which case forge never reads them at all.
 - **Uncommitted changes.** A pull that would overwrite them stops instead (`--force` goes ahead).
 - **What plugins can't reach.** A few saved values (a script's `RunContext`, some place-wide flags) stay as they are
   in the place file, and pull lists the ones in your trees.

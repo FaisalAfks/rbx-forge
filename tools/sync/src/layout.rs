@@ -14,6 +14,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result, anyhow, bail};
 
+use crate::ignore::Ignore;
 use crate::names;
 use crate::schema::Schema;
 use crate::text;
@@ -623,8 +624,8 @@ fn resolve(node: &mut Node, paths: &HashMap<String, u32>, at: &str) -> Result<()
 // ---------------------------------------------------------------------------------------------------------------------
 // Disk
 
-/// Reads every file under `root` (dot-files and dot-folders skipped).
-pub fn read_dir(root: &Path) -> Result<Files> {
+/// Reads every file under `root`, except dot-files, dot-folders and what `ignore` skips.
+pub fn read_dir(root: &Path, ignore: &Ignore) -> Result<Files> {
     let mut files = Files::new();
     let mut stack = vec![(root.to_path_buf(), String::new())];
     while let Some((dir, rel)) = stack.pop() {
@@ -639,7 +640,7 @@ pub fn read_dir(root: &Path) -> Result<Files> {
             let path = join(&rel, &name);
             if entry.file_type()?.is_dir() {
                 stack.push((entry.path(), path));
-            } else {
+            } else if !ignore.skips(&path) {
                 files.insert(path, std::fs::read(entry.path())?);
             }
         }

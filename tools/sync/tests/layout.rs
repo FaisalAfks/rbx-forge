@@ -2,6 +2,7 @@
 //! attributes, tags, repeated and awkward names. A tree written and read back must be the same tree, and writing it
 //! again must give the same bytes.
 
+use forge_sync::ignore::Ignore;
 use forge_sync::layout::{self, Files};
 use forge_sync::schema::{Class, Schema};
 use forge_sync::tree::Node;
@@ -714,7 +715,7 @@ fn files_go_to_disk_and_back() {
     let _ = std::fs::remove_dir_all(&dir);
     layout::write_files(&dir, &files).unwrap();
     std::fs::write(dir.join(".DS_Store"), b"x").unwrap();
-    let back = layout::read_dir(&dir).unwrap();
+    let back = layout::read_dir(&dir, &Ignore::default()).unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
     assert_eq!(files, back);
 }

@@ -19,6 +19,11 @@ studio = ["ReplicatedStorage", "Shared.v2"]   # a list of names, when a name has
 disk = "game/shared"
 
 [[sync]]
+studio = "ReplicatedStorage.Shared"
+disk = "src/shared"
+ignore = ["*.md"]             # files the tree leaves alone, like READMEs beside the code
+
+[[sync]]
 studio = "ReplicatedStorage.Packages"
 disk = "Packages"
 kind = "packages"             # what `wally install` made: disk owns it, forge only pushes (sync/packages.md)
@@ -30,6 +35,10 @@ Rules, checked whenever forge reads the file:
 - A disk path is a folder inside the repo: no `..`, no drive or leading `/`.
 - No two entries overlap, in Studio or on disk, so no file is written from two places.
 - `kind`, when given, is `"packages"`.
+- `ignore`, when given, is a list of patterns, as in `.gitignore`: one without a `/` matches a file's name in any
+  folder (`*.md`), one with a `/` its whole path in the tree's folder (`docs/**`). `*` and `?` stay within a name, `**`
+  crosses folders. A pattern can't reach outside the folder or hide forge's own files (`.luau`, `.toml`, `.rbxm`), and
+  a packages tree has none. Matching files are never read, written or removed.
 - Unknown keys are errors, so a typo never silently does nothing.
 
 `forge config` prints the file forge found, with its place and trees.

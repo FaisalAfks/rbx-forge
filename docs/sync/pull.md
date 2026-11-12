@@ -72,7 +72,7 @@ has to give the same bytes. That's decision 0011's round trip, run on every pull
 
 - **The place.** Pull only reads from Studio.
 - **Files forge doesn't write** in a synced folder (anything but `_.toml`, `.luau` and `.rbxm`) and dotfiles. Those are
-  never removed.
+  never removed, and files the tree's `ignore` patterns match are never read either.
 - **Anything outside the synced folders.**
 
 ## What stops a pull
@@ -82,7 +82,7 @@ Each of these stops the pull with an error that says what to do. `--force` goes 
 | What | Why | With `--force` |
 |---|---|---|
 | The folder has files but no `_.toml` | forge didn't make it, so it could be someone's own code | written over; files shaped like forge's (`.toml`, `.luau`, `.rbxm`) are replaced or removed |
-| The folder has a file forge doesn't write | pull won't remove it, and layout C has no place for it | left where it is |
+| The folder has a file forge doesn't write, and `ignore` doesn't match it | pull won't remove it, and layout C has no place for it | left where it is |
 | A file pull would change or remove has uncommitted changes in git | they'd be lost | written over |
 
 Files git doesn't track yet (an earlier pull nobody committed) don't stop it.
