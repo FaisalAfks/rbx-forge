@@ -9,6 +9,7 @@ repository.workspace = true
 anyhow = "1.0.104"
 base64 = "0.23.1"
 serde = { version = "1.0.229", features = ["derive"] }
+similar = "3.2.1"
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }  # exact float parsing (decision 0014)
 toml = "1.2.1"
 

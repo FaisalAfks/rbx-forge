@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `forge sync diff` lists what differs between Studio and the files, one line per change (#35, `docs/sync/diff.md`):
+  instances added or removed (with how many below them), subtrees moved or renamed, changed properties, attributes
+  and tags with both values, scripts with the lines added and removed, and changed model files. A command whose
+  output is cut short (`| head`) now ends quietly instead of failing
+
 - Pull lists scripts with an uncommitted draft, and `forge sync status` lists them without pulling (#20). A draft
   is found as a script whose `Source` (the last committed text) differs from the editor's text, since plugins can't
   read drafts. The files hold the editor's text; the warning says collaborators and the published game still get

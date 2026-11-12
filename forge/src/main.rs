@@ -2,6 +2,17 @@
 //! the server that holds the link to Studio, installs forge's plugin, and pulls a game's trees to disk; the rest of
 //! sync's commands join it step by step (docs/plan.md).
 
+/// Prints a line to standard output. When nothing reads it any more (`forge sync diff | head`), the command ends there
+/// instead of failing, as command-line tools do.
+macro_rules! say {
+    ($($t:tt)*) => {{
+        use std::io::Write as _;
+        if writeln!(std::io::stdout(), $($t)*).is_err() {
+            std::process::exit(0);
+        }
+    }};
+}
+
 mod client;
 mod game;
 mod pack;
@@ -73,6 +84,9 @@ enum SyncCommand {
     },
     /// Say whether the game's Studio is linked, and list scripts with an uncommitted draft.
     Status,
+    /// List what differs between Studio and the files: instances added, removed and moved, changed values, and
+    /// scripts with the lines changed.
+    Diff,
 }
 
 #[derive(Subcommand)]
@@ -113,6 +127,7 @@ fn run(cli: Cli) -> Result<()> {
         Command::Sync { command } => match command {
             SyncCommand::Pull { force } => block_on(sync::pull(&settings()?, file, force)),
             SyncCommand::Status => block_on(sync::status(&settings()?, file)),
+            SyncCommand::Diff => block_on(sync::diff(&settings()?, file)),
         },
         Command::Stop => block_on(stop(&settings()?, file)),
         Command::Status => block_on(status(&settings()?, file)),
@@ -120,7 +135,7 @@ fn run(cli: Cli) -> Result<()> {
             PluginCommand::Install { out } => install_plugin(&settings()?, out.as_deref()),
             PluginCommand::Sourcemap => {
                 let root = pack::tree(pack::files())?;
-                println!("{}", serde_json::to_string_pretty(&pack::sourcemap(&root))?);
+                say!("{}", serde_json::to_string_pretty(&pack::sourcemap(&root))?);
                 Ok(())
             }
         },
@@ -151,7 +166,7 @@ pub(crate) fn this_repo() -> Result<Option<Repo>> {
 
 async fn stop(settings: &Settings, file: Option<&Path>) -> Result<()> {
     let Some(mut link) = client::connect(settings, file, None, false).await? else {
-        println!("forge serve isn't running");
+        say!("forge serve isn't running");
         return Ok(());
     };
     match link.request(&Message::Stop).await? {
@@ -172,7 +187,7 @@ async fn stop(settings: &Settings, file: Option<&Path>) -> Result<()> {
         }
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
-    println!("stopped forge serve on port {port}");
+    say!("stopped forge serve on port {port}");
     Ok(())
 }
 
@@ -184,7 +199,7 @@ async fn status(settings: &Settings, file: Option<&Path>) -> Result<()> {
     if link.started {
         // The plugin only finds a new server on its next try, so give it one try's time before saying none is there.
         let log = client::log_file(file).map_or_else(|| "none".into(), |p| p.display().to_string());
-        println!("started forge serve in the background (log: {log})");
+        say!("started forge serve in the background (log: {log})");
         let wait = std::time::Duration::from_millis(
             settings.plugin.retry_ms + settings.plugin.open_timeout_ms,
         );
@@ -194,7 +209,7 @@ async fn status(settings: &Settings, file: Option<&Path>) -> Result<()> {
             report = ask_status(&mut link).await?;
         }
     }
-    print!("{}", status_text(&report));
+    say!("{}", status_text(&report).trim_end());
     Ok(())
 }
 
@@ -265,9 +280,9 @@ fn status_text(report: &StatusReport) -> String {
 
 fn install_plugin(settings: &Settings, out: Option<&Path>) -> Result<()> {
     let (path, scripts) = pack::install(settings, out)?;
-    println!("wrote {} ({scripts} scripts)", path.display());
+    say!("wrote {} ({scripts} scripts)", path.display());
     if out.is_none() {
-        println!("Studio loads plugin files only when it starts: restart Studio to load this one");
+        say!("Studio loads plugin files only when it starts: restart Studio to load this one");
     }
     Ok(())
 }
@@ -275,28 +290,30 @@ fn install_plugin(settings: &Settings, out: Option<&Path>) -> Result<()> {
 fn show_config(file: Option<&Path>, dir: &Path) -> Result<()> {
     let s = settings::load(file)?;
     match file {
-        Some(path) if path.is_file() => println!("settings: {}", path.display()),
-        Some(path) => println!("settings: defaults ({} doesn't exist)", path.display()),
-        None => println!("settings: defaults (this system has no settings folder)"),
+        Some(path) if path.is_file() => say!("settings: {}", path.display()),
+        Some(path) => say!("settings: defaults ({} doesn't exist)", path.display()),
+        None => say!("settings: defaults (this system has no settings folder)"),
     }
-    print!(
+    say!(
         "{}",
-        toml::to_string(&s).context("can't show the settings")?
+        toml::to_string(&s)
+            .context("can't show the settings")?
+            .trim_end()
     );
 
     let dir = std::path::absolute(dir).with_context(|| format!("can't use {}", dir.display()))?;
     match game::find(&dir) {
-        None => println!(
+        None => say!(
             "\ngame: no {} in {} or above it",
             game::FILE_NAME,
             dir.display()
         ),
         Some(path) => {
             let g = game::load(&path)?;
-            println!("\ngame: {}", path.display());
-            println!("place = {}", g.place);
+            say!("\ngame: {}", path.display());
+            say!("place = {}", g.place);
             for t in &g.trees {
-                println!("{} -> {}", t.studio.join("."), t.disk.display());
+                say!("{} -> {}", t.studio.join("."), t.disk.display());
             }
         }
     }

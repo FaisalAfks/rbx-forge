@@ -8,6 +8,7 @@
 //! - `pull` writes them to disk. Every folder's changes are worked out and checked before any file is written, so a
 //!   refused pull changes nothing.
 //! - `status` says what's linked and lists scripts with an uncommitted draft.
+//! - `diff` lists what differs between Studio and disk, both read as layout C has them.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -15,7 +16,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, bail};
 use forge_sync::schema::Schema;
-use forge_sync::{disk, layout, select, tree::Node, value::ValueType};
+use forge_sync::{diff, disk, layout, select, tree::Node, value::ValueType};
 use serde_json::{Value as Json, json};
 
 use crate::client::{self, Link};
@@ -163,7 +164,7 @@ pub async fn pull(settings: &Settings, settings_file: Option<&Path>, force: bool
     for (from, disk_name, folder, files, plan) in &work {
         let start = Instant::now();
         disk::apply(folder, files, plan)?;
-        println!(
+        say!(
             "{} -> {disk_name}: {} instances; {} written, {} removed, {} unchanged (read {:.0} ms, write {} ms)",
             from.name,
             from.node.walk().len(),
@@ -179,23 +180,68 @@ pub async fn pull(settings: &Settings, settings_file: Option<&Path>, force: bool
     Ok(())
 }
 
+/// What differs between disk and Studio, tree by tree, going from disk to Studio.
+pub async fn diff(settings: &Settings, settings_file: Option<&Path>) -> Result<()> {
+    let mut session = Session::open(settings, settings_file).await?;
+    let studio = session.read(settings).await?;
+    let schema = &studio.selection.schema;
+    let mut total = 0;
+    for (tree, from) in session.game.trees.iter().zip(&studio.trees) {
+        let folder = session.game.root.join(&tree.disk);
+        if !folder.join("_.toml").is_file() {
+            say!("{} -> {}: not pulled yet", from.name, tree.disk.display());
+            continue;
+        }
+        let changes = changes(&from.node, &folder, schema)
+            .with_context(|| format!("can't diff {}", from.name))?;
+        total += changes.len();
+        if changes.is_empty() {
+            say!("{} -> {}: no differences", from.name, tree.disk.display());
+            continue;
+        }
+        say!(
+            "{} -> {}: {} differences, disk -> Studio",
+            from.name,
+            tree.disk.display(),
+            changes.len()
+        );
+        for c in &changes {
+            say!("  {c}");
+        }
+    }
+    if total == 0 {
+        say!("disk and Studio match");
+    }
+    print_unsynced(&studio.selection);
+    print_drafts(studio.trees.iter().map(|t| (t.name.as_str(), &t.drafts)));
+    Ok(())
+}
+
+/// The changes from a tree's folder to Studio's copy. Both sides are read as files, so disk names and values match.
+pub fn changes(studio: &Node, folder: &Path, schema: &Schema) -> Result<Vec<diff::Change>> {
+    let on_disk =
+        layout::read(&layout::read_dir(folder)?, schema).context("reading the files on disk")?;
+    let in_studio = layout::read(&layout::write(studio, schema)?, schema)?;
+    diff::diff(&on_disk, &in_studio)
+}
+
 /// What's linked, and the scripts with an uncommitted draft.
 pub async fn status(settings: &Settings, settings_file: Option<&Path>) -> Result<()> {
     let mut session = Session::open(settings, settings_file).await?;
     let reply = match session.ask("drafts", json!({})).await {
         Ok(reply) => reply,
         Err(err) => {
-            println!("place {}: {err:#}", session.game.place);
+            say!("place {}: {err:#}", session.game.place);
             return Ok(());
         }
     };
-    println!("place {}: linked to Studio", session.game.place);
+    say!("place {}: linked to Studio", session.game.place);
     let lists: Vec<Vec<String>> = reply["drafts"]
         .as_array()
         .map(|a| a.iter().map(strings).collect())
         .unwrap_or_default();
     for (tree, drafts) in session.game.trees.iter().zip(&lists) {
-        println!(
+        say!(
             "{} -> {}: {} scripts with a draft",
             tree.studio.join("."),
             tree.disk.display(),
@@ -216,11 +262,11 @@ pub fn print_unsynced(selection: &select::Selection) {
     if selection.unsynced.is_empty() {
         return;
     }
-    println!(
+    say!(
         "not synced, because plugins can't read and write them (they stay as they are in the place file):"
     );
     for p in &selection.unsynced {
-        println!("  {p}");
+        say!("  {p}");
     }
 }
 
@@ -230,13 +276,13 @@ pub fn print_drafts<'a>(trees: impl Iterator<Item = (&'a str, &'a Vec<String>)>)
     if all.is_empty() {
         return;
     }
-    println!(
+    say!(
         "{} scripts have an uncommitted draft. forge has the editor's text for them, but collaborators and the \
          published game get the last committed text until each draft is committed in Studio's Drafts window:",
         all.len()
     );
     for name in all {
-        println!("  {name}");
+        say!("  {name}");
     }
 }
 
