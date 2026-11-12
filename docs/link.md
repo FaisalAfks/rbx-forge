@@ -86,7 +86,7 @@ is told to reinstall.)
 | `error` | server | `message` | |
 | `status` | command | | `status_report`: `version`, `port`, `studios` (each: `session`, `place`, `game`, `name`, `plugin`, `connected_secs`), `repos` (each: `root`, `place`), `refused` (each: `place`, `message`: a plugin turned away, for an old protocol, until one on that place links) |
 | `stop` | command | | `stopping`, then the server closes every connection and exits |
-| `to_studio` | command | `place`, `request` (any JSON, for the plugin) | `from_studio` with `reply`, or `error` |
+| `to_studio` | command | `place`, `request` (any JSON, for the plugin), `timeout_ms` (optional: instead of `server.request_timeout_ms`, for a push waiting on a click) | `from_studio` with `reply`, or `error` |
 | `request` | server | `id`, `request` | `reply` with `id` and `reply`, or `failed` with `id` and `message` |
 
 A message the server doesn't take is answered with `error`. Later steps add the messages for watch.
@@ -113,6 +113,7 @@ The sync requests (`forge sync pull`):
 |---|---|---|
 | `classes` | `trees`: each tree's path from `forge.toml`, a list of names | `classes`: each class under the trees, with every property's `name`, `owner`, `engine` type, `serialized`, `read`, `write` and `deprecated`, from `ReflectionService` |
 | `drafts` | `trees` | `drafts`: per tree, the full names of scripts whose `Source` differs from the editor's text (an uncommitted draft) |
+| `push` | `trees`, `pushTrees` (each tree's operations, `tools/sync/src/push.rs`), `summary`, `lines`, `drafts`, `timeoutMs` | `result`: `applied`, `cancelled` or `timeout`; sent once Apply or Cancel is clicked in Studio |
 | `read` | `trees`, `classes` (from the first reply), `properties` and `methods` (per class, each property's disk type), `models` (classes sent as a model file), `modelTimeoutMs`, `yieldEvery` | `trees`: per tree, `tree` (the instance tree in the JSON form `tools/sync/src/tree.rs` reads), `ms` (how long Studio took) and `drafts` (as above) |
 
 ### Matching places to repos

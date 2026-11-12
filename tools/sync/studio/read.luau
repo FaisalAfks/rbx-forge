@@ -14,6 +14,23 @@ type Json = any
 
 local read = {}
 
+-- The instances the last read sent, by id, so a push planned from that read can name them.
+local lastRead: { [number]: Instance } = {}
+
+-- The instance the last read sent as `id`.
+function read.instance(id: number): Instance
+	local inst: Instance? = lastRead[id]
+	if inst == nil or inst.Parent == nil then
+		error(`instance {id} from forge's last read is gone from Studio: the tree changed, run the command again`)
+	end
+	return inst
+end
+
+-- Points `id` at a new instance that took the old one's place (a MeshPart rebuilt from its model file).
+function read.replace(id: number, inst: Instance)
+	lastRead[id] = inst
+end
+
 -- The instance a forge.toml path names: a service, then one child per name. Two children with the same name would
 -- make the path mean either, so that's an error.
 local function resolve(path: { string }): Instance
@@ -310,6 +327,7 @@ function read.trees(request: ReadRequest): Json
 	local nextId = 0
 	local sinceYield = 0
 	local out = {}
+	lastRead = {}
 	for _, path in request.trees do
 		local started = os.clock()
 		local list = saved(resolve(path))
@@ -317,6 +335,7 @@ function read.trees(request: ReadRequest): Json
 		for _, inst in list do
 			nextId += 1
 			ids[inst] = nextId
+			lastRead[nextId] = inst
 		end
 		local nodes: { [Instance]: Json } = {}
 		local drafts = {}

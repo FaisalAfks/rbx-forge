@@ -34,6 +34,9 @@ pub enum Message {
     ToStudio {
         place: u64,
         request: Json,
+        /// How long this request may wait, when it isn't `server.request_timeout_ms` (a push waits for a click).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_ms: Option<u64>,
     },
     FromStudio {
         reply: Json,
@@ -190,6 +193,7 @@ mod tests {
             Message::ToStudio {
                 place: 3,
                 request: serde_json::json!({ "tool": "sync" }),
+                timeout_ms: Some(5),
             },
             Message::FromStudio {
                 reply: serde_json::json!([1, 2]),

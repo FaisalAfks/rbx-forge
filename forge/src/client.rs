@@ -85,13 +85,20 @@ impl Link {
         }
     }
 
-    /// Asks the Studio that has `place` open, through the server, and returns its reply.
-    pub async fn ask_studio(
+    /// Asks the Studio that has `place` open, through the server, and returns its reply. `timeout_ms` replaces
+    /// `server.request_timeout_ms` for this request.
+    pub async fn ask_studio_for(
         &mut self,
         place: u64,
         request: serde_json::Value,
+        timeout_ms: Option<u64>,
     ) -> Result<serde_json::Value> {
-        match self.request(&Message::ToStudio { place, request }).await? {
+        let message = Message::ToStudio {
+            place,
+            request,
+            timeout_ms,
+        };
+        match self.request(&message).await? {
             Message::FromStudio { reply } => Ok(reply),
             Message::Error { message } => bail!("{message}"),
             other => bail!("forge serve answered a request for Studio with {other:?}"),

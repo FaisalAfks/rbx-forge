@@ -9,6 +9,8 @@
 //!   refused pull changes nothing.
 //! - `status` says what's linked and lists scripts with an uncommitted draft.
 //! - `diff` lists what differs between Studio and disk, both read as layout C has them.
+//! - `push` works out what makes Studio match the files, keeps a backup of what it replaces, and sends the plan to
+//!   the plugin, which applies it only when Apply is clicked in Studio (decision 0015).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -16,7 +18,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, bail};
 use forge_sync::schema::Schema;
-use forge_sync::{diff, disk, layout, select, tree::Node, value::ValueType};
+use forge_sync::{diff, disk, layout, push as plan, select, tree::Node, value::ValueType};
 use serde_json::{Value as Json, json};
 
 use crate::client::{self, Link};
@@ -75,11 +77,23 @@ impl Session {
     }
 
     /// Asks the plugin's sync side for something.
-    pub async fn ask(&mut self, action: &str, mut request: Json) -> Result<Json> {
+    pub async fn ask(&mut self, action: &str, request: Json) -> Result<Json> {
+        self.ask_for(action, request, None).await
+    }
+
+    /// The same, with its own time limit.
+    pub async fn ask_for(
+        &mut self,
+        action: &str,
+        mut request: Json,
+        timeout_ms: Option<u64>,
+    ) -> Result<Json> {
         request["tool"] = json!("sync");
         request["action"] = json!(action);
         request["trees"] = json!(self.tree_paths());
-        self.link.ask_studio(self.game.place, request).await
+        self.link
+            .ask_studio_for(self.game.place, request, timeout_ms)
+            .await
     }
 
     /// Reads every tree from Studio.
@@ -223,6 +237,164 @@ pub fn changes(studio: &Node, folder: &Path, schema: &Schema) -> Result<Vec<diff
         layout::read(&layout::read_dir(folder)?, schema).context("reading the files on disk")?;
     let in_studio = layout::read(&layout::write(studio, schema)?, schema)?;
     diff::diff(&on_disk, &in_studio)
+}
+
+/// Makes Studio match the files, once Apply is clicked in Studio. `from` reads the trees from another folder laid out
+/// like the game's (a backup), instead of the game's own.
+pub async fn push(
+    settings: &Settings,
+    settings_file: Option<&Path>,
+    from: Option<&Path>,
+) -> Result<()> {
+    let mut session = Session::open(settings, settings_file).await?;
+    let studio = session.read(settings).await?;
+    let schema = &studio.selection.schema;
+    let base = match from {
+        Some(dir) => {
+            std::path::absolute(dir).with_context(|| format!("can't use {}", dir.display()))?
+        }
+        None => session.game.root.clone(),
+    };
+
+    let mut trees = Vec::new();
+    let mut lines = Vec::new();
+    let mut total = plan::Plan::default();
+    let mut drafts = Vec::new();
+    for (tree, from_studio) in session.game.trees.iter().zip(&studio.trees) {
+        let folder = base.join(&tree.disk);
+        if !folder.join("_.toml").is_file() {
+            bail!(
+                "{} has no files at {} to push: pull it first",
+                from_studio.name,
+                folder.display()
+            );
+        }
+        let on_disk = layout::read(&layout::read_dir(&folder)?, schema)
+            .with_context(|| format!("can't read {}", folder.display()))?;
+        let paths = layout::disk_paths(&from_studio.node, schema);
+        let p = plan::plan(&from_studio.node, paths, &on_disk)
+            .with_context(|| format!("can't plan {}", from_studio.name))?;
+        let in_studio = layout::read(&layout::write(&from_studio.node, schema)?, schema)?;
+        let changes = diff::diff(&in_studio, &on_disk)?;
+        if !changes.is_empty() {
+            lines.push(format!("{} <- {}", from_studio.name, tree.disk.display()));
+            lines.extend(changes.iter().map(|c| format!("  {}", c.push_line())));
+        }
+        drafts.extend(overwritten_drafts(from_studio, &p));
+        total.changed += p.changed;
+        total.added += p.added;
+        total.removed += p.removed;
+        total.moved += p.moved;
+        trees.push(json!({ "ops": p.ops }));
+        total.ops.extend(p.ops);
+    }
+    if total.is_empty() {
+        say!("Studio already matches the files: nothing to push");
+        return Ok(());
+    }
+    let summary = format!(
+        "{} changed, {} added, {} removed, {} moved",
+        total.changed, total.added, total.removed, total.moved
+    );
+    let backup = backup(&session.game, &studio)?;
+    say!("push: {summary}");
+    for l in &lines {
+        say!("{l}");
+    }
+    if !drafts.is_empty() {
+        say!("these scripts have an uncommitted draft, which the push writes over:");
+        for d in &drafts {
+            say!("  {d}");
+        }
+    }
+    say!("waiting for Apply or Cancel in Studio (forge's push window)...");
+    let request = json!({
+        "pushTrees": trees,
+        "summary": summary,
+        "lines": lines,
+        "drafts": drafts,
+        "timeoutMs": settings.sync.confirm_timeout_ms,
+    });
+    let wait = settings.sync.confirm_timeout_ms + settings.server.request_timeout_ms;
+    let reply = session.ask_for("push", request, Some(wait)).await?;
+    match reply["result"].as_str() {
+        Some("applied") => {
+            say!("applied in Studio as one change: {summary}");
+            say!(
+                "what it replaced is in {}; `forge sync push --from {}` puts it back",
+                backup.display(),
+                backup.display()
+            );
+        }
+        Some("cancelled") => say!("cancelled in Studio: nothing changed"),
+        Some("timeout") => say!(
+            "nobody clicked Apply within {} ms (`sync.confirm_timeout_ms`): nothing changed",
+            settings.sync.confirm_timeout_ms
+        ),
+        _ => bail!("the plugin answered the push with {reply}"),
+    }
+    if reply["result"] != "applied" {
+        // Nothing was replaced, so there's nothing to keep.
+        let _ = std::fs::remove_dir_all(&backup);
+    }
+    Ok(())
+}
+
+/// Scripts the push writes that have an uncommitted draft: the draft is what the push replaces (#20).
+fn overwritten_drafts(tree: &StudioTree, p: &plan::Plan) -> Vec<String> {
+    p.scripts
+        .iter()
+        .map(|script| {
+            if script.is_empty() {
+                tree.name.clone()
+            } else {
+                format!("{}.{}", tree.name, script.replace('/', "."))
+            }
+        })
+        .filter(|full| tree.drafts.contains(full))
+        .collect()
+}
+
+/// Writes Studio's trees as they are now to `.forge/backup/<time>/`, laid out like the game, so a push can put them
+/// back. `.forge/` gets a `.gitignore`, so backups never land in git.
+fn backup(game: &Game, studio: &StudioTrees) -> Result<std::path::PathBuf> {
+    let forge_dir = game.root.join(".forge");
+    let dir = forge_dir.join("backup").join(timestamp());
+    for (tree, from) in game.trees.iter().zip(&studio.trees) {
+        let files = layout::write(&from.node, &studio.selection.schema)?;
+        layout::write_files(&dir.join(&tree.disk), &files)
+            .with_context(|| format!("can't write the backup in {}", dir.display()))?;
+    }
+    std::fs::write(
+        forge_dir.join(".gitignore"),
+        "# forge's own files (backups): never committed\n*\n",
+    )
+    .with_context(|| format!("can't write {}", forge_dir.display()))?;
+    Ok(dir)
+}
+
+/// The time now, UTC, as `YYYYMMDD-HHMMSS`, so backup folders sort in order.
+fn timestamp() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let (days, rest) = ((secs / 86400) as i64, secs % 86400);
+    // Days since 1970 to a calendar date (Howard Hinnant's civil_from_days).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}{month:02}{day:02}-{:02}{:02}{:02}",
+        rest / 3600,
+        rest / 60 % 60,
+        rest % 60
+    )
 }
 
 /// What's linked, and the scripts with an uncommitted draft.

@@ -6,6 +6,7 @@ pub mod disk;
 pub mod layout;
 pub mod names;
 pub mod number;
+pub mod push;
 pub mod schema;
 pub mod select;
 pub mod text;

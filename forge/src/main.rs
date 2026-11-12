@@ -87,6 +87,12 @@ enum SyncCommand {
     /// List what differs between Studio and the files: instances added, removed and moved, changed values, and
     /// scripts with the lines changed.
     Diff,
+    /// Make Studio match the files. The plan shows in Studio, and nothing changes until Apply is clicked there.
+    Push {
+        /// Push the trees from this folder (laid out like the game's, such as a backup) instead of the game's own.
+        #[arg(long)]
+        from: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -128,6 +134,7 @@ fn run(cli: Cli) -> Result<()> {
             SyncCommand::Pull { force } => block_on(sync::pull(&settings()?, file, force)),
             SyncCommand::Status => block_on(sync::status(&settings()?, file)),
             SyncCommand::Diff => block_on(sync::diff(&settings()?, file)),
+            SyncCommand::Push { from } => block_on(sync::push(&settings()?, file, from.as_deref())),
         },
         Command::Stop => block_on(stop(&settings()?, file)),
         Command::Status => block_on(status(&settings()?, file)),
