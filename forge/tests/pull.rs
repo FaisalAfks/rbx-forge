@@ -284,3 +284,37 @@ fn sync_status_lists_drafts() {
     );
     assert!(out.contains("  StarterGui.Hud.Main"), "{out}");
 }
+
+#[test]
+fn diff_shows_what_changed_on_disk() {
+    let server = Server::new("diff");
+    let repo = game_repo(&server);
+    assert!(server.forge(&["status"], &repo).0);
+    let _requests = server.studio(42);
+    let (ok, out) = server.forge(&["sync", "diff"], &repo);
+    assert!(ok, "{out}");
+    assert!(
+        out.contains("StarterGui.Hud -> ui/hud: not pulled yet"),
+        "{out}"
+    );
+
+    assert!(server.forge(&["sync", "pull"], &repo).0);
+    let (ok, out) = server.forge(&["sync", "diff"], &repo);
+    assert!(ok, "{out}");
+    assert!(out.contains("disk and Studio match"), "{out}");
+
+    let props = repo.join("ui").join("hud").join("_.toml");
+    let text = std::fs::read_to_string(&props)
+        .unwrap()
+        .replace("[0, 340, 0, 66]", "[0, 100, 0, 66]");
+    std::fs::write(&props, text).unwrap();
+    std::fs::write(repo.join("ui").join("hud").join("Main.luau"), "return 2").unwrap();
+    let (ok, out) = server.forge(&["sync", "diff"], &repo);
+    assert!(ok, "{out}");
+    assert!(out.contains("2 differences, disk -> Studio"), "{out}");
+    assert!(
+        out.contains("  ~ (top) Size: [0, 100, 0, 66] -> [0, 340, 0, 66]"),
+        "{out}"
+    );
+    assert!(out.contains("  ~ Main script: +2 -1 lines"), "{out}");
+}
