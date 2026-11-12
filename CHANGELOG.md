@@ -11,6 +11,9 @@
 - A settings section or `forge.toml` key no tool owns is named as such in the error. Every MCP tool's `repo` argument
   is described, and the MCP's instructions lost stray spaces
 - CI runs the Rust and Luau checks only when their code changes; the changelog has a section per tool
+- Releases carry Windows and Linux builds as zips named for rokit (`forge-X.Y.Z-windows-x86_64.zip`,
+  `forge-X.Y.Z-linux-x86_64.zip`), so a game's `rokit.toml` can pin forge and its CI can install it. `forge.exe` is
+  still attached on its own (#80)
 
 ### sync
 
