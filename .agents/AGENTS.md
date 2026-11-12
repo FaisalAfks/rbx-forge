@@ -15,11 +15,12 @@ What's built next and why is in [docs/plan.md](../docs/plan.md); why things are 
 
 | Path | What |
 |---|---|
-| `forge/` | the `forge` binary (Rust): commands, settings (`defaults.toml`), a game's `forge.toml`, `forge serve` and packing the plugin |
-| `mcp/` | `forge mcp`: sync's commands as MCP tools for agents (Rust) |
-| `plugin/` | forge's Studio plugin (Luau): the link to `forge serve`; each tool's Studio side is in `tools/<name>/studio/` |
-| `tools/sync/` | sync's own code (Rust): values, schema, the instance tree, layout C on disk, which properties to read (`properties.toml`); and `studio/`, its side in the plugin (Luau) |
-| `docs/` | the plan, decisions, `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/README.md` (the guide), `sync/format.md` (the disk format), `sync/pull.md`, `sync/diff.md`, `sync/push.md`, `sync/check.md`, `sync/watch.md`, `mcp.md`, and later a guide per tool |
+| `core/` | what every tool uses (Rust): the link (`forge serve`, client, protocol), settings (`defaults.toml`), a game's `forge.toml`, and the `Tool` interface each tool fills in |
+| `forge/` | the `forge` binary (Rust): forge's own commands, the list of tools (`TOOLS`), and packing the plugin |
+| `mcp/` | `forge mcp`: every tool's MCP tools for agents (Rust) |
+| `plugin/` | forge's Studio plugin (Luau): the link to `forge serve`, the window, and the list of tools' Studio sides |
+| `tools/sync/` | forge sync (Rust): values, schema, the instance tree, layout C on disk, which properties to read (`properties.toml`), its settings (`defaults.toml`) and commands; and `studio/`, its side in the plugin (Luau) |
+| `docs/` | the plan, decisions, `tools.md` (how the repo holds tools, and adding one), `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/README.md` (the guide), `sync/format.md` (the disk format), `sync/pull.md`, `sync/diff.md`, `sync/push.md`, `sync/check.md`, `sync/watch.md`, `mcp.md`, and later a guide per tool |
 | `scripts/` | dev helpers (`setup-dev.ps1`) |
 | `.agents/` | this file and `skills/`: step-by-step how-tos (new task, probe, review, release, working with sync) |
 

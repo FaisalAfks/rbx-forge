@@ -2,7 +2,7 @@
 //! place open) and reads the trees from Studio the same way (decisions 0006, 0008, 0011):
 //!
 //! Two requests go to the plugin through the server. The first asks which classes are under the trees, with Studio's
-//! reflection data for each. forge then chooses which properties to read (`forge_sync::select`), so that choice lives
+//! reflection data for each. forge then chooses which properties to read (`crate::select`), so that choice lives
 //! in Rust and in `tools/sync/properties.toml`. The second reads the trees.
 //!
 //! - `pull` writes them to disk. Every folder's changes are worked out and checked before any file is written, so a
@@ -16,17 +16,17 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use anyhow::{Context, Result, anyhow, bail};
-use forge_sync::schema::Schema;
-use forge_sync::{diff, disk, layout, push as plan, select, tree::Node, value::ValueType};
+use forge_core::client::Link;
+use forge_core::{Cx, say};
 use serde_json::{Value as Json, json};
 
-use crate::client::{self, Link};
-use crate::game::{self, Game};
-use crate::protocol::Message;
+use crate::schema::Schema;
 use crate::settings::Settings;
+use crate::trees::{self, Game};
+use crate::{diff, disk, layout, push as plan, select, tree::Node, value::ValueType};
 
 /// A game and the link to the Studio that has its place open.
 pub struct Session {
@@ -55,24 +55,16 @@ pub struct StudioTrees {
 
 impl Session {
     /// The game around the current folder, and a link to its Studio (starting `forge serve` if needed).
-    pub async fn open(settings: &Settings, settings_file: Option<&Path>) -> Result<Session> {
-        let cwd = std::env::current_dir().context("can't read the current folder")?;
-        let path = game::find(&cwd).ok_or_else(|| {
-            anyhow!(
-                "no {} here or above: forge sync runs in a game's repo",
-                game::FILE_NAME
-            )
-        })?;
-        let game = game::load(&path)?;
+    pub async fn open(cx: &Cx, settings: &Settings) -> Result<Session> {
+        let core = cx.game("forge sync")?;
+        let game = trees::read(&core)?;
         if game.trees.is_empty() {
-            bail!("{} has no [[sync]] trees", path.display());
+            bail!(
+                "{} has no [[sync]] trees",
+                core.root.join(forge_core::game::FILE_NAME).display()
+            );
         }
-        let mut link = client::connect(settings, settings_file, crate::this_repo()?, true)
-            .await?
-            .expect("connect starts the server when asked to");
-        if link.started {
-            wait_for_studio(&mut link, settings, game.place).await?;
-        }
+        let link = forge_core::session::link(cx, settings, &core).await?;
         Ok(Session { game, link })
     }
 
@@ -191,8 +183,8 @@ fn strings(v: &Json) -> Vec<String> {
         .unwrap_or_default()
 }
 
-pub async fn pull(settings: &Settings, settings_file: Option<&Path>, force: bool) -> Result<()> {
-    let mut session = Session::open(settings, settings_file).await?;
+pub async fn pull(cx: &Cx, settings: &Settings, force: bool) -> Result<()> {
+    let mut session = Session::open(cx, settings).await?;
     let studio = session.read(settings).await?;
     let schema = &studio.selection.schema;
 
@@ -227,8 +219,8 @@ pub async fn pull(settings: &Settings, settings_file: Option<&Path>, force: bool
 }
 
 /// What differs between disk and Studio, tree by tree, going from disk to Studio.
-pub async fn diff(settings: &Settings, settings_file: Option<&Path>) -> Result<()> {
-    let mut session = Session::open(settings, settings_file).await?;
+pub async fn diff(cx: &Cx, settings: &Settings) -> Result<()> {
+    let mut session = Session::open(cx, settings).await?;
     let studio = session.read(settings).await?;
     let schema = &studio.selection.schema;
     let mut total = 0;
@@ -273,12 +265,8 @@ pub fn changes(studio: &Node, folder: &Path, schema: &Schema) -> Result<Vec<diff
 
 /// Builds a copy of each tree (or only `only`, by Studio path or folder) from its files, reads the copy and compares
 /// it with the original, value by value. Prints each difference; the copies are gone afterwards.
-pub async fn check(
-    settings: &Settings,
-    settings_file: Option<&Path>,
-    only: Option<&str>,
-) -> Result<()> {
-    let mut session = Session::open(settings, settings_file).await?;
+pub async fn check(cx: &Cx, settings: &Settings, only: Option<&str>) -> Result<()> {
+    let mut session = Session::open(cx, settings).await?;
     if let Some(only) = only {
         session
             .game
@@ -366,12 +354,8 @@ pub async fn check(
 
 /// Makes Studio match the files, once Apply is clicked in Studio. `from` reads the trees from another folder laid out
 /// like the game's (a backup), instead of the game's own.
-pub async fn push(
-    settings: &Settings,
-    settings_file: Option<&Path>,
-    from: Option<&Path>,
-) -> Result<()> {
-    let mut session = Session::open(settings, settings_file).await?;
+pub async fn push(cx: &Cx, settings: &Settings, from: Option<&Path>) -> Result<()> {
+    let mut session = Session::open(cx, settings).await?;
     let studio = session.read(settings).await?;
     let schema = &studio.selection.schema;
     let base = match from {
@@ -526,8 +510,8 @@ fn timestamp() -> String {
 }
 
 /// What's linked, and the scripts with an uncommitted draft.
-pub async fn status(settings: &Settings, settings_file: Option<&Path>) -> Result<()> {
-    let mut session = Session::open(settings, settings_file).await?;
+pub async fn status(cx: &Cx, settings: &Settings) -> Result<()> {
+    let mut session = Session::open(cx, settings).await?;
     let reply = match session.ask("drafts", json!({})).await {
         Ok(reply) => reply,
         Err(err) => {
@@ -618,20 +602,4 @@ fn read_back(name: &str, sent: &Node, files: &layout::Files, schema: &Schema) ->
         );
     }
     Ok(())
-}
-
-/// A server this command just started has no Studio yet: the plugin finds it on its next try.
-async fn wait_for_studio(link: &mut Link, settings: &Settings, place: u64) -> Result<()> {
-    let wait = Duration::from_millis(settings.plugin.retry_ms + settings.plugin.open_timeout_ms);
-    let deadline = Instant::now() + wait;
-    loop {
-        let linked = match link.request(&Message::Status).await? {
-            Message::StatusReport(r) => r.studios.iter().any(|s| s.place == place),
-            other => bail!("forge serve answered status with {other:?}"),
-        };
-        if linked || Instant::now() >= deadline {
-            return Ok(());
-        }
-        tokio::time::sleep(Duration::from_millis(250)).await;
-    }
 }

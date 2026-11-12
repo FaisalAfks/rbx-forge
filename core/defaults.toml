@@ -1,0 +1,21 @@
+# forge's own settings and their defaults; each tool's are in tools/<name>/defaults.toml. Any of them can be changed
+# in the settings file that `forge config` names.
+
+[server]
+# The port `forge serve` listens on (127.0.0.1 only) and the plugin connects to (decision 0015).
+port = 34900
+# How long a command waits for a `forge serve` it started itself to take connections.
+start_timeout_ms = 5000
+# How long a command waits for Studio to answer a request passed on by the server (a whole pull is one request).
+request_timeout_ms = 120000
+# The largest message the server takes or sends, in MiB. A whole tree is one message; 16 MiB was tested both ways
+# (decision 0012).
+max_message_mb = 64
+
+[plugin]
+# How long the plugin waits between tries when `forge serve` isn't running. Written into the plugin by
+# `forge plugin install`, so a change needs a reinstall.
+retry_ms = 2000
+# How long the plugin waits for a try to open or fail before giving up on it. Studio reports a refused connection
+# after about 2 s.
+open_timeout_ms = 5000

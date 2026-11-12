@@ -403,18 +403,30 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs 7.0.0",
+ "forge-core",
  "forge-mcp",
  "forge-sync",
- "futures-util",
- "notify",
  "rbx_dom_weak",
  "rbx_xml",
  "serde",
  "serde_json",
  "tokio",
+ "tungstenite",
+]
+
+[[package]]
+name = "forge-core"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dirs 7.0.0",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tokio",
  "tokio-tungstenite",
  "toml",
- "tungstenite",
 ]
 
 [[package]]
@@ -422,8 +434,9 @@ name = "forge-mcp"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "forge-core",
  "rmcp",
- "serde",
+ "serde_json",
  "tokio",
 ]
 
@@ -433,9 +446,13 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
+ "clap",
+ "forge-core",
+ "notify",
  "serde",
  "serde_json",
  "similar",
+ "tokio",
  "toml",
 ]
 

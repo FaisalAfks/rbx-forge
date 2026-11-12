@@ -14,8 +14,8 @@ use rbx_dom_weak::types::{Attributes, Enum, Variant};
 use rbx_dom_weak::{InstanceBuilder, WeakDom};
 use serde::Serialize;
 
-use crate::protocol::PROTOCOL;
-use crate::settings::Settings;
+use forge_core::protocol::PROTOCOL;
+use forge_core::settings::Settings;
 
 mod embedded {
     include!(concat!(env!("OUT_DIR"), "/plugin_files.rs"));
@@ -201,7 +201,7 @@ mod tests {
     use super::*;
 
     fn settings() -> Settings {
-        crate::settings::load(None).unwrap()
+        forge_core::settings::load(None, &[]).unwrap()
     }
 
     #[test]

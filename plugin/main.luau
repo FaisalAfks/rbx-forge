@@ -9,8 +9,15 @@ local link = require(script.link)
 local settingsStore = require(script.settings)
 local window = require(script.window)
 
--- Each tool's Studio side (tools/<name>/studio/, packed under tools), by the name commands ask for.
-local tools: { [string]: { handle: (request: any, context: any) -> any } } = {
+-- What a tool's Studio side (tools/<name>/studio/main.luau) gives the plugin: it answers its requests, and may say
+-- what a request did, as a line in the window's Recent list.
+type ToolSide = {
+	handle: (request: any, context: any) -> any,
+	describe: ((request: any, result: any) -> string?)?,
+}
+
+-- Every tool's Studio side, by the name commands ask for (decision 0019). A new tool is one more line here.
+local tools: { [string]: ToolSide } = {
 	sync = require(script.tools.sync.main),
 }
 
@@ -36,42 +43,27 @@ local linkSettings = {
 local connection: link.Connection? = nil
 local ui: window.Window
 
--- What the plugin gives every tool: the parts that need the plugin or its window.
-local context = {
-	-- Shows a push's plan and waits for Apply, unless the "Apply pushes" setting says not to ask (decision 0018).
-	confirm = function(ask: any): string
-		if not settingsStore.asks(settingsStore.load(plugin), ask.changes or math.huge) then
-			return "apply"
-		end
-		return ui.ask(ask)
-	end,
-	notify = function(event: any)
-		local c = connection
-		if c then
-			c.notify(event)
-		end
-	end,
-	showClashes = function(lines: { string })
-		ui.setClashes(lines)
-	end,
-}
-
--- A line in the window's Recent list for each request a command sends.
-local function note(request: any, result: any)
-	if request.action == "read" then
-		ui.log(`Read {#request.trees} trees for forge`)
-	elseif request.action == "drafts" then
-		ui.log("Listed scripts with drafts")
-	elseif request.action == "check" then
-		ui.log(`Round-trip check of {#request.trees} trees`)
-	elseif request.action == "watch" then
-		ui.log(`Watching {#request.trees} trees`)
-	elseif request.action == "unwatch" then
-		ui.log("Stopped watching")
-	elseif request.action == "push" then
-		local outcome = if type(result) == "table" then result.result else "?"
-		ui.log(`Push {outcome}: {request.summary}`)
-	end
+-- What the plugin gives each tool: the parts that need the plugin or its window.
+local function contextFor(name: string)
+	return {
+		-- Shows a push's plan and waits for Apply, unless the "Apply pushes" setting says not to ask (decision 0018).
+		confirm = function(ask: any): string
+			if not settingsStore.asks(settingsStore.load(plugin), ask.changes or math.huge) then
+				return "apply"
+			end
+			return ui.ask(ask)
+		end,
+		notify = function(event: any)
+			local c = connection
+			if c then
+				c.notify(event)
+			end
+		end,
+		-- Keeps the tool's notice on the home page until it passes nil.
+		showNotice = function(notice: window.Notice?)
+			ui.setNotice(name, notice)
+		end,
+	}
 end
 
 local function handle(request: any): any
@@ -79,12 +71,15 @@ local function handle(request: any): any
 	if tool == nil then
 		error(`forge's plugin has no tool {request.tool}: run forge plugin install`)
 	end
-	local ok, result = pcall(tool.handle, request, context)
+	local ok, result = pcall(tool.handle, request, contextFor(request.tool))
 	if not ok then
 		ui.log(`{request.action} failed: {result}`)
 		error(result, 0)
 	end
-	note(request, result)
+	local line = if tool.describe then tool.describe(request, result) else nil
+	if line then
+		ui.log(line)
+	end
 	return result
 end
 

@@ -1,12 +1,29 @@
 # Format, lint and type checks for the plugin's Luau (plugin/ and every tools/<name>/studio/). The tools are pinned in
 # rokit.toml. luau-lsp needs a sourcemap to follow `require(script.x)`, which forge writes from the same layout it
-# packs, and Roblox's types for plugins, pinned to the luau-lsp release.
+# packs, and Roblox's types for plugins, pinned to the luau-lsp release. It runs when the plugin, a tool's studio/,
+# the packing that makes the sourcemap, or the tools' settings change (decision 0019).
 name: Luau
 
 on:
   pull_request:
+    paths:
+      - "plugin/**"
+      - "tools/*/studio/**"
+      - "forge/src/pack.rs"
+      - "rokit.toml"
+      - "selene.toml"
+      - "stylua.toml"
+      - ".github/workflows/luau.yml"
   push:
     branches: [main]
+    paths:
+      - "plugin/**"
+      - "tools/*/studio/**"
+      - "forge/src/pack.rs"
+      - "rokit.toml"
+      - "selene.toml"
+      - "stylua.toml"
+      - ".github/workflows/luau.yml"
 
 permissions:
   contents: read

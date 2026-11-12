@@ -1,6 +1,6 @@
 # forge's link: the server, the plugin and the messages
 
-How forge's commands reach Studio (decisions 0012 and 0015). Code: `forge/src/server.rs`, `client.rs` and
+How forge's commands reach Studio (decisions 0012 and 0015). Code: `core/src/server.rs`, `client.rs` and
 `protocol.rs`, and `plugin/link.luau`.
 
 ## The parts

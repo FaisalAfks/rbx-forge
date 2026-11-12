@@ -1,6 +1,7 @@
-# The Rust workspace: the forge binary now; mcp/ and tools/<name>/ join it with their first code (docs/plan.md).
+# The Rust workspace (decision 0019): core/ is what every tool uses, tools/<name>/ is each tool, forge/ is the binary
+# that lists them, and mcp/ serves their MCP tools.
 [workspace]
-members = ["forge", "mcp", "tools/sync"]
+members = ["core", "forge", "mcp", "tools/sync"]
 resolver = "3"
 
 [workspace.package]

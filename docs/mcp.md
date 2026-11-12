@@ -1,6 +1,7 @@
 # forge's MCP server
 
-`forge mcp` serves forge's sync tools to an MCP client (an agent) over stdio (`mcp/src/lib.rs`). Each tool runs the
+`forge mcp` serves every forge tool's MCP tools (each tool's `mcp_tools`, docs/tools.md) to an MCP client (an agent)
+over stdio (`mcp/src/lib.rs`). Each tool runs the
 same `forge` command a person would, in the game's repo, and returns what it printed, so the two can't drift apart. A
 command that fails comes back as an error with its own message.
 

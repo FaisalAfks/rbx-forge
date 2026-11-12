@@ -7,7 +7,7 @@ description: Release a new rbx-forge version (SemVer tag and a GitHub release wi
 
 1. Make sure `main` is green and everything for the release is merged.
 2. On a branch `release/vX.Y.Z`, in `CHANGELOG.md`, rename `## Unreleased` to `## X.Y.Z - YYYY-MM-DD` and start a new
-   empty `## Unreleased` above it. Open a PR "Release vX.Y.Z" that says `Closes #<release issue>`, and merge on green.
+   empty `## Unreleased` above it. Keep its `### forge` and per-tool sections; drop any left empty. Open a PR "Release vX.Y.Z" that says `Closes #<release issue>`, and merge on green.
 3. Tag `main`: `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow makes the GitHub release, with notes
    generated from the PR labels.
 4. Check the notes read well. Edit them in the owner's voice if needed. Never move or delete a tag: a mistake gets the
