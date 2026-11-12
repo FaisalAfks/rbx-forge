@@ -26,6 +26,7 @@ use forge_core::client::Link;
 use forge_core::{Cx, say};
 use serde_json::{Value as Json, json};
 
+use crate::ignore::Ignore;
 use crate::schema::Schema;
 use crate::settings::Settings;
 use crate::trees::{self, Game, Kind, Tree};
@@ -206,7 +207,7 @@ pub async fn pull(cx: &Cx, settings: &Settings, force: bool) -> Result<()> {
             layout::write(&from.node, schema).with_context(|| format!("{} on disk", from.name))?;
         read_back(&from.name, &from.node, &files, schema)?;
         let folder = session.game.root.join(&tree.disk);
-        let plan = disk::plan(&folder, &files, force)
+        let plan = disk::plan(&folder, &files, &tree.ignore, force)
             .with_context(|| format!("can't pull {}", from.name))?;
         work.push((from, tree.disk.display().to_string(), folder, files, plan));
     }
@@ -241,7 +242,7 @@ pub async fn diff(cx: &Cx, settings: &Settings) -> Result<()> {
             say!("{} -> {}: {why}", from.name, tree.disk.display());
             continue;
         }
-        let changes = changes(tree.kind, &from.node, &folder, schema)
+        let changes = changes(tree.kind, &from.node, &folder, &tree.ignore, schema)
             .with_context(|| format!("can't diff {}", from.name))?;
         total += changes.len();
         if changes.is_empty() {
@@ -271,20 +272,26 @@ pub fn changes(
     kind: Kind,
     studio: &Node,
     folder: &Path,
+    ignore: &Ignore,
     schema: &Schema,
 ) -> Result<Vec<diff::Change>> {
-    let on_disk = disk_tree(kind, &studio.name, folder, schema)?;
+    let on_disk = disk_tree(kind, &studio.name, folder, ignore, schema)?;
     let in_studio = layout::read(&layout::write(studio, schema)?, schema)?;
     diff::diff(&on_disk, &in_studio)
 }
 
 /// A tree as its folder has it, with layout C's disk names, so it lines up with Studio's copy path for path. A
 /// packages tree is read the way Rojo reads it, then written and read in layout C in memory to get those names.
-pub fn disk_tree(kind: Kind, name: &str, folder: &Path, schema: &Schema) -> Result<Node> {
+pub fn disk_tree(
+    kind: Kind,
+    name: &str,
+    folder: &Path,
+    ignore: &Ignore,
+    schema: &Schema,
+) -> Result<Node> {
     match kind {
-        Kind::Synced => {
-            layout::read(&layout::read_dir(folder)?, schema).context("reading the files on disk")
-        }
+        Kind::Synced => layout::read(&layout::read_dir(folder, ignore)?, schema)
+            .context("reading the files on disk"),
         Kind::Packages => {
             let node = packages::read(folder, name)?;
             layout::read(&layout::write(&node, schema)?, schema)
@@ -334,7 +341,7 @@ pub async fn check(cx: &Cx, settings: &Settings, only: Option<&str>) -> Result<(
             Kind::Synced => layout::read(&layout::write(&from.node, schema)?, schema)?,
             Kind::Packages => {
                 let folder = session.game.root.join(&tree.disk);
-                disk_tree(tree.kind, top_name(tree), &folder, schema)
+                disk_tree(tree.kind, top_name(tree), &folder, &tree.ignore, schema)
                     .with_context(|| format!("can't read {}", from.name))?
             }
         };
@@ -437,7 +444,7 @@ pub async fn push(cx: &Cx, settings: &Settings, from: Option<&Path>) -> Result<(
                 folder.display()
             );
         }
-        let on_disk = disk_tree(kind, top_name(tree), &folder, schema)
+        let on_disk = disk_tree(kind, top_name(tree), &folder, &tree.ignore, schema)
             .with_context(|| format!("can't read {}", folder.display()))?;
         let paths = layout::disk_paths(&from_studio.node, schema);
         let p = plan::plan(&from_studio.node, paths, &on_disk)

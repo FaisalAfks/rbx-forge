@@ -5,6 +5,7 @@
 pub mod commands;
 pub mod diff;
 pub mod disk;
+pub mod ignore;
 pub mod layout;
 pub mod merge;
 pub mod names;

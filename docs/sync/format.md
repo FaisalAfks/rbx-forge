@@ -48,7 +48,7 @@ its own moves from its parent's `_.toml` into a folder.
 
 Sibling order isn't stored. Neither folders nor TOML sections keep it, and UI order comes from `LayoutOrder`.
 
-Files and folders starting with `.` are skipped. Any other file forge didn't write is an error that names it. A
+Files and folders starting with `.` are skipped, and so are files the tree's `ignore` patterns match (`forge-toml.md`). Any other file forge didn't write is an error that names it. A
 `.luau` file with no section is a script of the class its name gives.
 
 Pull also writes a `.gitattributes` with `* -text` into each synced folder, so git never changes the bytes above

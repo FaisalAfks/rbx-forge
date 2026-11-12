@@ -3,9 +3,11 @@
 
 use std::path::{Component, PathBuf};
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use forge_core::game::Game as CoreGame;
 use serde::Deserialize;
+
+use crate::ignore::Ignore;
 
 /// The `forge.toml` key sync owns.
 pub const KEY: &str = "sync";
@@ -27,6 +29,8 @@ pub struct Tree {
     /// The folder on disk, relative to the game's root.
     pub disk: PathBuf,
     pub kind: Kind,
+    /// Files in the folder the tree leaves alone (`ignore = ["*.md"]`).
+    pub ignore: Ignore,
 }
 
 /// Who owns a tree's files.
@@ -63,6 +67,7 @@ struct FileTree {
     studio: StudioPath,
     disk: String,
     kind: Option<FileKind>,
+    ignore: Option<Vec<String>>,
 }
 
 /// Reads and checks a game's `[[sync]]` trees.
@@ -75,7 +80,15 @@ pub fn read(game: &CoreGame) -> Result<Game> {
                 None => Kind::Synced,
                 Some(FileKind::Packages) => Kind::Packages,
             };
-            check_tree(t.studio.names(), &t.disk, kind)
+            let ignore = match (kind, t.ignore) {
+                (_, None) => Ignore::default(),
+                (Kind::Packages, Some(_)) => bail!(
+                    "{:?}: a packages tree can't have `ignore`; forge reads only scripts in packages",
+                    t.disk
+                ),
+                (Kind::Synced, Some(p)) => Ignore::new(p).with_context(|| format!("{:?}", t.disk))?,
+            };
+            check_tree(t.studio.names(), &t.disk, kind, ignore)
         })
         .collect::<Result<Vec<_>>>()?;
     check_no_overlap(&trees)?;
@@ -103,7 +116,7 @@ impl StudioPath {
     }
 }
 
-fn check_tree(studio: Vec<String>, disk: &str, kind: Kind) -> Result<Tree> {
+fn check_tree(studio: Vec<String>, disk: &str, kind: Kind, ignore: Ignore) -> Result<Tree> {
     if studio.is_empty() || studio.iter().any(String::is_empty) {
         bail!("studio path {:?} has an empty name", studio.join("."));
     }
@@ -125,6 +138,7 @@ fn check_tree(studio: Vec<String>, disk: &str, kind: Kind) -> Result<Tree> {
         studio,
         disk: disk_path,
         kind,
+        ignore,
     })
 }
 
@@ -204,6 +218,40 @@ disk = \"a\"
 kind = \"rojo\""
             )
             .contains("unknown variant")
+        );
+    }
+
+    #[test]
+    fn reads_ignore_patterns() {
+        let g = game(
+            "place = 1
+[[sync]]
+studio = \"A.B\"
+disk = \"a\"
+ignore = [\"*.md\"]",
+        )
+        .unwrap();
+        assert!(g.trees[0].ignore.skips("x/README.md"));
+        assert!(
+            error(
+                "place = 1
+[[sync]]
+studio = \"A.B\"
+disk = \"a\"
+ignore = [\"*.luau\"]"
+            )
+            .contains("forge's own files")
+        );
+        assert!(
+            error(
+                "place = 1
+[[sync]]
+studio = \"A.B\"
+disk = \"a\"
+kind = \"packages\"
+ignore = [\"*.md\"]"
+            )
+            .contains("packages tree can't have `ignore`")
         );
     }
 

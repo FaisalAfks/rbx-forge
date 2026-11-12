@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use forge_sync::commands::disk_tree;
+use forge_sync::ignore::Ignore;
 use forge_sync::schema::{Class, Schema};
 use forge_sync::tree::Node;
 use forge_sync::trees::Kind;
@@ -306,7 +307,7 @@ fn rojo_made() -> Node {
 fn a_push_onto_what_rojo_made_changes_nothing() {
     let dir = install("push");
     let s = schema();
-    let on_disk = disk_tree(Kind::Packages, "Packages", &dir, &s).unwrap();
+    let on_disk = disk_tree(Kind::Packages, "Packages", &dir, &Ignore::default(), &s).unwrap();
     let studio = rojo_made();
     let paths: HashMap<u32, String> = layout::disk_paths(&studio, &s);
     let plan = push::plan(&studio, paths, &on_disk).unwrap();
@@ -318,7 +319,7 @@ fn a_push_onto_what_rojo_made_changes_nothing() {
         "return { v = 2 }",
     )
     .unwrap();
-    let on_disk = disk_tree(Kind::Packages, "Packages", &dir, &s).unwrap();
+    let on_disk = disk_tree(Kind::Packages, "Packages", &dir, &Ignore::default(), &s).unwrap();
     let plan = push::plan(&studio, layout::disk_paths(&studio, &s), &on_disk).unwrap();
     assert_eq!((plan.changed, plan.added, plan.removed), (1, 0, 0));
     let _ = std::fs::remove_dir_all(&dir);

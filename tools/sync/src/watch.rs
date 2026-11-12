@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::commands::{Session, StudioTree, print_drafts};
+use crate::ignore::Ignore;
 use crate::merge::{self, Clash, Flat};
 use crate::settings::Settings;
 use crate::tree::Node;
@@ -58,6 +59,8 @@ struct Tree {
     name: String,
     folder: PathBuf,
     kind: Kind,
+    /// Files in the folder the tree leaves alone.
+    ignore: Ignore,
     /// The state Studio and the files last agreed on.
     base: Flat,
     /// The last copies seen on each side, which a pick takes its value from.
@@ -78,7 +81,7 @@ pub async fn watch(cx: &Cx, settings: &Settings) -> Result<()> {
         if let Some(why) = crate::commands::missing(t.kind, &folder) {
             bail!("{} has no files to watch: {why}", from.name);
         }
-        let changes = crate::commands::changes(t.kind, &from.node, &folder, &schema)?;
+        let changes = crate::commands::changes(t.kind, &from.node, &folder, &t.ignore, &schema)?;
         if !changes.is_empty() {
             bail!(
                 "{} differs between Studio and its files ({} differences, `forge sync diff` lists them): run \
@@ -95,6 +98,7 @@ pub async fn watch(cx: &Cx, settings: &Settings) -> Result<()> {
             name: from.name.clone(),
             folder,
             kind: t.kind,
+            ignore: t.ignore.clone(),
             base: flat.clone(),
             studio: flat.clone(),
             disk: flat,
@@ -190,19 +194,20 @@ async fn reconcile(
     let from = &studio.trees[0];
     let t = &mut trees[i];
     if t.kind == Kind::Packages {
-        let target = crate::commands::disk_tree(t.kind, &from.node.name, &t.folder, schema)?;
+        let target =
+            crate::commands::disk_tree(t.kind, &from.node.name, &t.folder, &t.ignore, schema)?;
         return send(session, settings, i, from, &target, schema, true).await;
     }
     let in_studio = merge::flatten(&layout::read(&layout::write(&from.node, schema)?, schema)?)?;
     let on_disk = merge::flatten(
-        &layout::read(&layout::read_dir(&t.folder)?, schema)
+        &layout::read(&layout::read_dir(&t.folder, &t.ignore)?, schema)
             .with_context(|| format!("can't read {}", t.folder.display()))?,
     )?;
     let m = merge::merge(&t.base, &in_studio, &on_disk);
 
     // The files: only what changed is written.
     let files = layout::write(&merge::unflatten(&m.to_disk)?, schema)?;
-    let p = disk::plan(&t.folder, &files, true)?;
+    let p = disk::plan(&t.folder, &files, &t.ignore, true)?;
     if !p.write.is_empty() || !p.remove.is_empty() {
         disk::apply(&t.folder, &files, &p)?;
         say!(

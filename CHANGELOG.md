@@ -27,6 +27,9 @@
 - A plain Folder needs no `_.toml` (decision 0022): a folder with no `_.toml` and no init file reads as a Folder, and
   pull writes one only when there's more to say. Trees pulled before read the same; the next pull drops the files
   that said only `class = "Folder"` (#77)
+- A tree can leave files alone: `ignore = ["*.md"]` in its `[[sync]]` takes `.gitignore`-style patterns, and matching
+  files (READMEs beside the code) are never read, written or removed. Patterns that would hide forge's own files are
+  refused (#78)
 
 ## 0.1.1 - 2026-11-12
 
