@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-11-12
+
 ### forge
 
 - forge is now laid out for many tools (decision 0019, `docs/tools.md`). What every tool uses (the link to Studio,
