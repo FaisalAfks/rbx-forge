@@ -5,7 +5,7 @@ members = ["core", "forge", "mcp", "tools/sync"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 repository = "https://github.com/FaisalAfks/rbx-forge"
 
