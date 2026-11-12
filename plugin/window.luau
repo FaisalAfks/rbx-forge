@@ -76,8 +76,10 @@ local function card(parent: Instance, order: number, border: Color3?): Frame
 	return f
 end
 
-local function text(parent: Instance, s: string, order: number, opts: { [string]: any }?): TextLabel
-	local o = opts or {}
+type TextOpts = { mono: boolean?, bold: boolean?, size: number?, color: Color3? }
+
+local function text(parent: Instance, s: string, order: number, opts: TextOpts?): TextLabel
+	local o: TextOpts = opts or {}
 	local l = Instance.new("TextLabel")
 	l.BackgroundTransparency = 1
 	l.Size = UDim2.fromScale(1, 0)
@@ -103,9 +105,8 @@ local function button(parent: Instance, label: string, order: number, main: bool
 	b.AutoButtonColor = true
 	b.BorderSizePixel = 0
 	b.LayoutOrder = order
-	b.BackgroundColor3 = theme(
-		if main then Enum.StudioStyleGuideColor.DialogMainButton else Enum.StudioStyleGuideColor.DialogButton
-	)
+	b.BackgroundColor3 =
+		theme(if main then Enum.StudioStyleGuideColor.DialogMainButton else Enum.StudioStyleGuideColor.DialogButton)
 	b.TextColor3 = theme(
 		if main then Enum.StudioStyleGuideColor.DialogMainButtonText else Enum.StudioStyleGuideColor.DialogButtonText
 	)
@@ -260,7 +261,7 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 		end
 		if values.applyPushes == "large" then
 			local box = Instance.new("TextBox")
-			box.Size = UDim2.new(0, 120, 0, 28)
+			box.Size = UDim2.fromOffset(120, 28)
 			box.LayoutOrder = 5
 			box.Font = Enum.Font.SourceSans
 			box.TextSize = 15
@@ -280,10 +281,15 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 			end)
 			box.Parent = body
 		end
-		text(body, "Without a click, the plan is still printed by the command, and what a push replaces is still backed up.", 6, {
-			color = theme(Enum.StudioStyleGuideColor.DimmedText),
-			size = 13,
-		})
+		text(
+			body,
+			"Without a click, the plan is still printed by the command, and what a push replaces is still backed up.",
+			6,
+			{
+				color = theme(Enum.StudioStyleGuideColor.DimmedText),
+				size = 13,
+			}
+		)
 		text(body, "Link", 7, { bold = true })
 		local b = button(
 			body,
@@ -322,10 +328,11 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 		header.Size = UDim2.new(1, 0, 0, 28)
 		header.LayoutOrder = 0
 		header.Parent = page
-		local title = text(header, if view == "settings" then "Settings" elseif view == "plan" then "Push" else "forge", 1, {
-			bold = true,
-			size = 18,
-		})
+		local title =
+			text(header, if view == "settings" then "Settings" elseif view == "plan" then "Push" else "forge", 1, {
+				bold = true,
+				size = 18,
+			})
 		title.Size = UDim2.fromScale(0.6, 1)
 		local nav = row(header, 1)
 		nav.Size = UDim2.fromScale(1, 1)
