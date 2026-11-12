@@ -49,10 +49,12 @@ function watch.start(request: Request, notify: (event: any) -> ())
 		local set = watched[class]
 		if set == nil then
 			set = { Name = true, Parent = true }
-			for name in request.properties[class] or {} do
+			local props: { [string]: string } = request.properties[class] or {}
+			for name in props do
 				set[name] = true
 			end
-			for name in request.methods[class] or {} do
+			local byMethod: { [string]: string } = request.methods[class] or {}
+			for name in byMethod do
 				set[name] = true
 			end
 			watched[class] = set

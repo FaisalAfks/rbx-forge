@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `forge sync watch` keeps Studio and the files in step both ways until Ctrl+C (#38, #39, `docs/sync/watch.md`).
+  The plugin says when a tree has gone quiet after a change in Studio, and forge watches the folders. Either way,
+  both copies are merged three ways against the state they last agreed on: a change on one side goes to the other,
+  and a value both sides changed differently is held as a clash, listed by `forge sync status` and forge's window,
+  until `forge sync pick <n> studio|disk`. forge's own writes merge to nothing, so they don't echo. Link protocol 3
+
 - forge's plugin has a button in Studio's Plugins tab and a proper window (#59): a home page with the link's state, a
   push waiting for Apply, and recent activity, with settings and a push's full plan as their own views. Settings live in
   Studio only: "Apply pushes" (ask every time, ask for large pushes, or never ask) and "Connect automatically". Applying
