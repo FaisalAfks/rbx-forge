@@ -37,6 +37,13 @@ The new server doesn't see the command's environment, so the command passes the 
 
 ## The plugin
 
+forge's button in Studio's Plugins tab opens its window (#59): a home page with the link's state (and Connect or
+Disconnect), a push waiting for Apply, and the last few things commands asked for. Settings and a push's full plan
+open as their own views. The settings (`plugin/settings.luau`) are stored with `plugin:SetSetting`, so they last
+across restarts and only change in Studio:
+- **Apply pushes**: ask every time, ask for large pushes, or never ask (`sync/push.md`, decision 0018);
+- **Connect automatically**: start the link when the place opens (on by default); off, the window's Connect starts it.
+
 `forge plugin install` packs the plugin into `forge.rbxmx` and writes it to Studio's Plugins folder
 (`%LOCALAPPDATA%\Roblox\Plugins` on Windows, `~/Documents/Roblox/Plugins` on macOS), or to `--out`. Studio loads
 plugin files only when it starts, so Studio has to restart after an install.
