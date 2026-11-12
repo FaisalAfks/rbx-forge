@@ -20,6 +20,7 @@ mod protocol;
 mod server;
 mod settings;
 mod sync;
+mod watch;
 
 use std::path::{Path, PathBuf};
 
@@ -93,6 +94,16 @@ enum SyncCommand {
         /// Only this tree: its Studio path (StarterGui.Hud) or its folder.
         tree: Option<String>,
     },
+    /// Keep Studio and the files in step both ways until Ctrl+C. A value both sides changed differently is held as a
+    /// clash until a side is picked.
+    Watch,
+    /// Settle a clash a running watch holds: keep Studio's value or the files'.
+    Pick {
+        /// The clash's number, as `forge sync status` lists them.
+        number: usize,
+        /// studio or disk: the side whose value wins.
+        side: String,
+    },
     /// Make Studio match the files. The plan shows in Studio, and nothing changes until Apply is clicked there.
     Push {
         /// Push the trees from this folder (laid out like the game's, such as a backup) instead of the game's own.
@@ -140,6 +151,8 @@ fn run(cli: Cli) -> Result<()> {
             SyncCommand::Pull { force } => block_on(sync::pull(&settings()?, file, force)),
             SyncCommand::Status => block_on(sync::status(&settings()?, file)),
             SyncCommand::Diff => block_on(sync::diff(&settings()?, file)),
+            SyncCommand::Watch => block_on(watch::watch(&settings()?, file)),
+            SyncCommand::Pick { number, side } => watch::pick(number, &side),
             SyncCommand::Check { tree } => {
                 block_on(sync::check(&settings()?, file, tree.as_deref()))
             }

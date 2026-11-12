@@ -4,6 +4,7 @@
 pub mod diff;
 pub mod disk;
 pub mod layout;
+pub mod merge;
 pub mod names;
 pub mod number;
 pub mod push;

@@ -59,6 +59,26 @@ local function resolve(path: { string }): Instance
 	return node
 end
 
+-- The instance a forge.toml path names (for the watcher).
+function read.root(path: { string }): Instance
+	return resolve(path)
+end
+
+-- Model files kept while a watch runs, so a tree read again after a small change doesn't serialize every MeshPart
+-- again. The watcher drops an instance's entry whenever it changes; without a watch nothing is kept, since nothing
+-- would say when an entry goes stale.
+local modelCache: { [Instance]: string } = {}
+local caching = false
+
+function read.setModelCaching(on: boolean)
+	caching = on
+	modelCache = {}
+end
+
+function read.forgetModel(inst: Instance)
+	modelCache[inst] = nil
+end
+
 -- Every saved instance under `root`, root first, parents before children.
 local function saved(root: Instance): { Instance }
 	local out = {}
@@ -267,6 +287,10 @@ end
 -- A model file of `inst` alone, without its children, as base64 (decision 0011). SerializeInstancesAsync has been
 -- seen never to answer, so it has a time limit.
 local function model(inst: Instance, timeoutSeconds: number): string
+	local cached = if caching then modelCache[inst] else nil
+	if cached then
+		return cached
+	end
 	-- Clone gives nil for an instance that can't be copied, which its type doesn't say.
 	local cloned = inst:Clone() :: Instance?
 	if cloned == nil then
@@ -292,7 +316,11 @@ local function model(inst: Instance, timeoutSeconds: number): string
 	if not done[1] then
 		error(`{inst:GetFullName()}: its model file failed: {done[2]}`)
 	end
-	return buffer.tostring(EncodingService:Base64Encode(done[2]))
+	local b64 = buffer.tostring(EncodingService:Base64Encode(done[2]))
+	if caching then
+		modelCache[inst] = b64
+	end
+	return b64
 end
 
 export type ReadRequest = {

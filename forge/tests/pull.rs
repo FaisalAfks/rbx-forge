@@ -12,7 +12,7 @@ use serde_json::{Value as Json, json};
 use tungstenite::Message;
 
 /// The link protocol this forge speaks (forge/src/protocol.rs).
-const PROTOCOL: u32 = 2;
+const PROTOCOL: u32 = 3;
 
 /// A script with CRLF line ends and no last newline: git would change those bytes without the `.gitattributes`.
 const SCRIPT: &str = "local x = 1\r\nreturn x";

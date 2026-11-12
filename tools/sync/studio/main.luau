@@ -3,6 +3,7 @@
 -- tools/sync (docs/link.md).
 
 local read = require(script.Parent.read)
+local watch = require(script.Parent.watch)
 local write = require(script.Parent.write)
 
 local sync = {}
@@ -10,6 +11,10 @@ local sync = {}
 export type Context = {
 	-- Shows forge's confirm window and waits: "apply", "cancel" or "timeout".
 	confirm: (ask: any) -> string,
+	-- Sends an event to forge (watch).
+	notify: (event: any) -> (),
+	-- Shows watch's held clashes in forge's window.
+	showClashes: (lines: { string }) -> (),
 }
 
 -- A push waits for Apply in Studio before anything changes (decision 0015).
@@ -47,6 +52,16 @@ function sync.handle(request: any, context: Context): any
 		return push(request, context)
 	elseif request.action == "check" then
 		return write.check(request)
+	elseif request.action == "watch" then
+		watch.start(request, context.notify)
+		return { watching = #request.trees }
+	elseif request.action == "unwatch" then
+		watch.stop()
+		context.showClashes({})
+		return { watching = 0 }
+	elseif request.action == "clashes" then
+		context.showClashes(request.lines)
+		return { shown = #request.lines }
 	end
 	error(`forge's plugin has no sync action {request.action}: run forge plugin install`)
 end

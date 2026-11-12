@@ -6,7 +6,8 @@ use serde_json::Value as Json;
 
 /// Bumped when a message changes shape, so an old plugin or command gets a clear error instead of a wrong reading.
 /// 2: requests passed to Studio (`to_studio`, `request`, `reply`, `failed`).
-pub const PROTOCOL: u32 = 2;
+/// 3: events from Studio for watch (`notify`, `subscribe`, `event`).
+pub const PROTOCOL: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
@@ -55,6 +56,20 @@ pub enum Message {
     Failed {
         id: u64,
         message: String,
+    },
+    /// A command asks for the events of the Studio on `place` (watch). The server answers `subscribed`, then sends
+    /// each `event` on this connection until it closes.
+    Subscribe {
+        place: u64,
+    },
+    Subscribed,
+    /// The plugin tells the server something happened (a tree changed); the server passes it on as `event`.
+    Notify {
+        event: Json,
+    },
+    Event {
+        place: u64,
+        event: Json,
     },
 }
 
@@ -209,6 +224,15 @@ mod tests {
             Message::Failed {
                 id: 4,
                 message: "no".into(),
+            },
+            Message::Subscribe { place: 5 },
+            Message::Subscribed,
+            Message::Notify {
+                event: serde_json::json!({ "tree": 0 }),
+            },
+            Message::Event {
+                place: 5,
+                event: serde_json::json!({ "tree": 0 }),
             },
         ];
         for m in all {

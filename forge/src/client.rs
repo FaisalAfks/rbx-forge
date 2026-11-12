@@ -85,6 +85,31 @@ impl Link {
         }
     }
 
+    /// Subscribes this connection to the events of the Studio on `place` (watch). After this, read them with
+    /// `next_event`; use another connection for requests.
+    pub async fn subscribe(&mut self, place: u64) -> Result<()> {
+        match self.request(&Message::Subscribe { place }).await? {
+            Message::Subscribed => Ok(()),
+            other => bail!("forge serve answered subscribe with {other:?}"),
+        }
+    }
+
+    /// The next event on a subscribed connection.
+    pub async fn next_event(&mut self) -> Result<serde_json::Value> {
+        loop {
+            match self.socket.next().await {
+                Some(Ok(Frame::Text(text))) => {
+                    if let Ok(Message::Event { event, .. }) = Message::from_text(text.as_str()) {
+                        return Ok(event);
+                    }
+                }
+                Some(Ok(Frame::Close(_))) | None => bail!("forge serve closed the connection"),
+                Some(Ok(_)) => {}
+                Some(Err(err)) => return Err(err).context("lost the connection to forge serve"),
+            }
+        }
+    }
+
     /// Asks the Studio that has `place` open, through the server, and returns its reply. `timeout_ms` replaces
     /// `server.request_timeout_ms` for this request.
     pub async fn ask_studio_for(

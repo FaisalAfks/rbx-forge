@@ -74,6 +74,8 @@ struct State {
     pending: HashMap<u64, (u64, oneshot::Sender<Answer>)>,
     /// Places whose plugin was turned away (an old protocol), and why, until a plugin on that place links.
     refused: BTreeMap<u64, String>,
+    /// Commands subscribed to a place's events (watch), and where to send them.
+    subscribers: Vec<(u64, mpsc::UnboundedSender<Json>)>,
 }
 
 type Shared = Arc<Mutex<State>>;
@@ -239,6 +241,14 @@ async fn serve_studio(
                 None => break,
                 Some(Ok(Message::Reply { id: request, reply })) => answer(&state, request, Ok(reply)),
                 Some(Ok(Message::Failed { id: request, message })) => answer(&state, request, Err(message)),
+                Some(Ok(Message::Notify { event })) => {
+                    // Each command watching this place gets it; one that has gone is dropped from the list.
+                    state
+                        .lock()
+                        .expect("state lock")
+                        .subscribers
+                        .retain(|(place, tx)| *place != hello.place || tx.send(event.clone()).is_ok());
+                }
                 Some(Ok(other)) => {
                     let reply = Message::Error { message: format!("forge serve doesn't take {other:?} from Studio") };
                     if send(&mut socket, &reply).await.is_err() {
@@ -293,6 +303,18 @@ async fn serve_cli(
                 let _ = stop.send(true);
                 return;
             }
+            Ok(Message::Subscribe { place }) => {
+                let (tx, rx) = mpsc::unbounded_channel();
+                state
+                    .lock()
+                    .expect("state lock")
+                    .subscribers
+                    .push((place, tx));
+                if send(&mut socket, &Message::Subscribed).await.is_ok() {
+                    forward_events(socket, place, rx).await;
+                }
+                return;
+            }
             Ok(Message::ToStudio {
                 place,
                 request,
@@ -314,6 +336,22 @@ async fn serve_cli(
         };
         if send(&mut socket, &reply).await.is_err() {
             return;
+        }
+    }
+}
+
+/// Sends a subscribed command each event of its place until the command leaves.
+async fn forward_events(mut socket: Socket, place: u64, mut events: mpsc::UnboundedReceiver<Json>) {
+    loop {
+        tokio::select! {
+            message = next_message(&mut socket) => if message.is_none() {
+                return;
+            },
+            Some(event) = events.recv() => {
+                if send(&mut socket, &Message::Event { place, event }).await.is_err() {
+                    return;
+                }
+            }
         }
     }
 }
