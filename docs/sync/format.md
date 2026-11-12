@@ -1,6 +1,6 @@
 # How forge sync writes a tree on disk
 
-The reference for layout C (decisions 0008 and 0020). Code: `tools/sync/src/layout.rs`, `names.rs` and `value.rs`. Every file
+The reference for layout C (decisions 0008, 0020 and 0022). Code: `tools/sync/src/layout.rs`, `names.rs` and `value.rs`. Every file
 is written whole, in one fixed form (decision 0015), so the same tree always gives the same bytes and an unchanged
 pull changes no file. Comments in these files aren't kept.
 
@@ -10,7 +10,7 @@ Each synced tree (a `[[sync]]` in `forge.toml`) is a folder.
 
 | What | Where |
 |---|---|
-| An instance with children | a folder, holding its own `_.toml` |
+| An instance with children | a folder, holding its own `_.toml` (a plain Folder has none, below) |
 | An instance with no children | a section `[Name]` in its parent's `_.toml` |
 | A script's text | a `.luau` file named the way Luau tools read it (below), byte for byte (CRLF, a BOM, a missing last newline all kept) |
 | A MeshPart's model (decision 0011) | `Name.rbxm` in its parent's folder |
@@ -28,6 +28,10 @@ A script whose file name says everything (its class, its real name, no propertie
 and a script's folder with nothing more to say has no `_.toml`. When there's more, the section or `_.toml` is written
 as for any instance, `class` included, and the class has to match the file name. A Script's `RunContext` is a property
 like any other; the file name follows the class only. forge writes text only for these three classes.
+
+**Folders** (decision 0022). A folder with no `_.toml` and no init file is a Folder, named by its disk name. A Folder
+gets a `_.toml` only when there's more to say: an escaped name, tags, properties, attributes, or leaf children (their
+sections). The tree's top folder always has one.
 
 A `_.toml` holds, in this order:
 1. `class = "Frame"`.
@@ -138,7 +142,7 @@ Reading stops at the first problem and names the file, the key and the expected 
 
 Problems it catches:
 - unknown properties and wrong shapes;
-- a missing `_.toml`;
+- a missing `_.toml` at the tree's top;
 - an `.rbxm` file with no instance to belong to;
 - a script file whose name gives a different class than its section;
 - files in forge 0.1's layout (a tree's text in `_.luau`, a Script's text in `Name.luau`, a script's text beside its

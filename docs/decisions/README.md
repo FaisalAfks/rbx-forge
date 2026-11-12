@@ -26,3 +26,4 @@ A decision is changed by a new record that replaces the old one, never by editin
 | [0019](0019-one-repo-shared-core.md) | One repo, a shared core, and one interface every tool fills in | 2026-11-12 |
 | [0020](0020-script-file-names.md) | Script files are named the way Luau tools read them (reverses part of 0008) | 2026-11-12 |
 | [0021](0021-packages-from-wally-or-pesde.md) | Packages come from Wally or pesde; forge only puts them in Studio | 2026-11-12 |
+| [0022](0022-plain-folders-need-no-toml.md) | A plain Folder needs no `_.toml` (reverses part of 0008) | 2026-11-12 |
