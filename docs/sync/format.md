@@ -33,6 +33,9 @@ Sibling order isn't stored. Neither folders nor TOML sections keep it, and UI or
 
 Files and folders starting with `.` are skipped. Any other file forge didn't write is an error that names it.
 
+Pull also writes a `.gitattributes` with `* -text` into each synced folder, so git never changes the bytes above
+(`pull.md`).
+
 ## Names on disk
 
 An instance's disk name is its name, made safe:

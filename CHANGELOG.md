@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- `forge sync pull` (#34, `docs/sync/pull.md`) writes each tree in `forge.toml` from Studio to disk in layout C.
+  - Studio lists the classes under the trees. forge then chooses which properties to read from Studio's own
+    reflection data and `tools/sync/properties.toml`: saved and writable ones, twins, method-only values, and model
+    files for MeshParts. Any saved property it can't sync is listed after the pull.
+  - Only changed files are written. A second pull with nothing changed writes nothing, MeshPart model files
+    included.
+  - A `.gitattributes` in each folder keeps git from changing the bytes, checked on a clone with
+    `core.autocrlf=true`.
+  - Pull stops, writing nothing, for a folder forge didn't make, a file it doesn't write, or uncommitted changes it
+    would overwrite (`--force` goes ahead).
+  - The server now passes a command's request to the Studio on its place (link protocol 2). Pulling five real trees,
+    689 instances, took 1.2 s
+
 - forge's link to Studio (#33, `docs/link.md`):
   - `forge serve`, one per PC on 127.0.0.1, which any command that needs it starts in the background;
   - forge's plugin, which connects from Studio's edit session, tries again quietly when the server isn't there, and

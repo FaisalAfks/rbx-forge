@@ -18,6 +18,9 @@ export type Connection = {
 	stop: () -> (),
 }
 
+-- Answers one request the server passes on from a forge command, or errors with why it can't.
+export type Handler = (request: any) -> any
+
 local link = {}
 
 -- What the plugin tells the server about this Studio.
@@ -34,7 +37,7 @@ local function hello(settings: Settings, session: string): string
 	})
 end
 
-function link.start(settings: Settings): Connection
+function link.start(settings: Settings, handler: Handler): Connection
 	local running = true
 	local current: WebStreamClient? = nil
 	-- A server error is shown once, not on every try (an old plugin keeps getting the same one).
@@ -42,12 +45,34 @@ function link.start(settings: Settings): Connection
 	local session = HttpService:GenerateGUID(false)
 	local url = `ws://127.0.0.1:{settings.port}`
 
-	local function handle(raw: string)
+	-- Runs a request apart from the link, so a long one (a whole pull) never holds up other messages, and sends the
+	-- answer back on the connection it came in on.
+	local function answer(client: WebStreamClient, message: any)
+		task.spawn(function()
+			local ok, result = pcall(handler, message.request)
+			local reply = if ok
+				then { op = "reply", id = message.id, reply = result }
+				else { op = "failed", id = message.id, message = tostring(result) }
+			local encoded, text = pcall(HttpService.JSONEncode, HttpService, reply)
+			if not encoded then
+				text = HttpService:JSONEncode({
+					op = "failed",
+					id = message.id,
+					message = `can't send the answer: {text}`,
+				})
+			end
+			pcall(client.Send, client, text)
+		end)
+	end
+
+	local function handle(client: WebStreamClient, raw: string)
 		local ok, message = pcall(HttpService.JSONDecode, HttpService, raw)
 		if not ok or type(message) ~= "table" then
 			return
 		end
-		if message.op == "welcome" then
+		if message.op == "request" then
+			answer(client, message)
+		elseif message.op == "welcome" then
 			lastError = nil
 			print(`forge: linked to forge serve {message.version} on port {settings.port}`)
 		elseif message.op == "error" and message.message ~= lastError then
@@ -78,7 +103,9 @@ function link.start(settings: Settings): Connection
 			opened = true
 			client:Send(hello(settings, session))
 		end)
-		client.MessageReceived:Connect(handle)
+		client.MessageReceived:Connect(function(raw)
+			handle(client, raw)
+		end)
 		client.Error:Connect(finish)
 		client.Closed:Connect(finish)
 		task.delay(settings.openTimeoutSeconds, function()

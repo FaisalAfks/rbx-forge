@@ -74,8 +74,9 @@ for example) is shown once, not on every try.
 ## Messages
 
 JSON text frames, each an object with an `op`. Every connection starts with `hello`. The server answers `welcome`, or
-`error` and closes the connection. `protocol` is 1, and is raised when a message changes shape. A plugin or command
-with another protocol gets an error that says what to run.
+`error` and closes the connection. `protocol` is 2, and is raised when a message changes shape. A plugin or command
+with another protocol gets an error that says what to run. (2 added requests to Studio; a plugin installed before it
+is told to reinstall.)
 
 | op | From | Fields | Answer |
 |---|---|---|---|
@@ -83,10 +84,35 @@ with another protocol gets an error that says what to run.
 | `hello` | command | `role = "cli"`, `protocol`, `version`, `repo`: `{ root, place }` of the `forge.toml` it runs under, or null | `welcome` |
 | `welcome` | server | `server = "forge"`, `version`, `protocol` | |
 | `error` | server | `message` | |
-| `status` | command | | `status_report`: `version`, `port`, `studios` (each: `session`, `place`, `game`, `name`, `plugin`, `connected_secs`), `repos` (each: `root`, `place`) |
+| `status` | command | | `status_report`: `version`, `port`, `studios` (each: `session`, `place`, `game`, `name`, `plugin`, `connected_secs`), `repos` (each: `root`, `place`), `refused` (each: `place`, `message`: a plugin turned away, for an old protocol, until one on that place links) |
 | `stop` | command | | `stopping`, then the server closes every connection and exits |
+| `to_studio` | command | `place`, `request` (any JSON, for the plugin) | `from_studio` with `reply`, or `error` |
+| `request` | server | `id`, `request` | `reply` with `id` and `reply`, or `failed` with `id` and `message` |
 
-A message the server doesn't take is answered with `error`. Later steps add the messages for pull, push and watch.
+A message the server doesn't take is answered with `error`. Later steps add the messages for watch.
+
+### Requests to Studio
+
+The server passes a command's `request` on to the one Studio that has `place` open, and its answer back. It doesn't
+look inside: the plugin hands each request to the tool its `tool` field names (`sync` for now), and that tool's
+`action` says what to do. The command gets an `error` when:
+- no Studio with that place is linked;
+- more than one is (close all but one);
+- Studio doesn't answer within `server.request_timeout_ms` (two minutes by default; a whole pull is one request);
+- Studio closes the link before answering.
+
+A message larger than `server.max_message_mb` (64 MiB by default) closes the connection it came on, and the server's
+log says so. A whole tree goes as one message.
+
+The plugin runs each request apart from the link, so a long one doesn't hold up others. A request that fails in the
+plugin comes back as `failed`, with the Luau error as the message.
+
+The sync requests (`forge sync pull`):
+
+| action | Fields | Reply |
+|---|---|---|
+| `classes` | `trees`: each tree's path from `forge.toml`, a list of names | `classes`: each class under the trees, with every property's `name`, `owner`, `engine` type, `serialized`, `read`, `write` and `deprecated`, from `ReflectionService` |
+| `read` | `trees`, `classes` (from the first reply), `properties` and `methods` (per class, each property's disk type), `models` (classes sent as a model file), `modelTimeoutMs`, `yieldEvery` | `trees`: per tree, `tree` (the instance tree in the JSON form `tools/sync/src/tree.rs` reads) and `ms` (how long Studio took) |
 
 ### Matching places to repos
 

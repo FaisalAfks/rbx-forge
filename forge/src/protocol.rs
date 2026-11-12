@@ -2,9 +2,11 @@
 //! own commands, each tagged by `op`. Every connection starts with a `hello` and gets a `welcome` or an `error`.
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value as Json;
 
 /// Bumped when a message changes shape, so an old plugin or command gets a clear error instead of a wrong reading.
-pub const PROTOCOL: u32 = 1;
+/// 2: requests passed to Studio (`to_studio`, `request`, `reply`, `failed`).
+pub const PROTOCOL: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
@@ -27,6 +29,30 @@ pub enum Message {
     /// A command asks the server to stop. The server answers `stopping`, closes every connection and exits.
     Stop,
     Stopping,
+    /// A command asks the Studio on `place` something. The server passes `request` on and answers `from_studio`, or
+    /// `error` when no single Studio has that place open or it doesn't answer in time.
+    ToStudio {
+        place: u64,
+        request: Json,
+    },
+    FromStudio {
+        reply: Json,
+    },
+    /// The server passes a command's request to a plugin.
+    Request {
+        id: u64,
+        request: Json,
+    },
+    /// The plugin's answer to request `id`.
+    Reply {
+        id: u64,
+        reply: Json,
+    },
+    /// The plugin couldn't do request `id`.
+    Failed {
+        id: u64,
+        message: String,
+    },
 }
 
 /// Who is connecting, and what the server needs to know about them.
@@ -75,6 +101,15 @@ pub struct StatusReport {
     pub studios: Vec<Studio>,
     /// Every repo a command has run in since the server started.
     pub repos: Vec<Repo>,
+    /// Places whose plugin the server turned away, and why.
+    #[serde(default)]
+    pub refused: Vec<Refused>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Refused {
+    pub place: u64,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -145,9 +180,32 @@ mod tests {
                     connected_secs: 5,
                 }],
                 repos: vec![],
+                refused: vec![Refused {
+                    place: 5,
+                    message: "old".into(),
+                }],
             }),
             Message::Stop,
             Message::Stopping,
+            Message::ToStudio {
+                place: 3,
+                request: serde_json::json!({ "tool": "sync" }),
+            },
+            Message::FromStudio {
+                reply: serde_json::json!([1, 2]),
+            },
+            Message::Request {
+                id: 4,
+                request: serde_json::json!({}),
+            },
+            Message::Reply {
+                id: 4,
+                reply: serde_json::json!(null),
+            },
+            Message::Failed {
+                id: 4,
+                message: "no".into(),
+            },
         ];
         for m in all {
             assert_eq!(Message::from_text(&m.to_text()).unwrap(), m);

@@ -1,0 +1,72 @@
+# Which properties pull reads from Studio, beyond the rule (saved, readable, writable, not deprecated). Built into
+# forge; `select.rs` applies it to the reflection data of the running Studio (decision 0006). Keys are
+# `Owner.Property`, the class that declares the property, as ReflectionService reports it.
+
+# Each engine type a saved property can have, and the disk type it's written as (docs/sync/format.md). A saved
+# property whose engine type isn't here can't be read from Luau.
+[types]
+bool = "bool"
+int = "int"
+int64 = "int"
+float = "float"
+double = "float"
+string = "string"
+ContentId = "string"
+Content = "Content"
+Enum = "Enum"
+BrickColor = "BrickColor"
+Color3 = "Color3"
+ColorSequence = "ColorSequence"
+NumberSequence = "NumberSequence"
+NumberRange = "NumberRange"
+CoordinateFrame = "CFrame"
+OptionalCoordinateFrame = "CFrame"
+Faces = "Faces"
+Axes = "Axes"
+Font = "Font"
+PhysicalProperties = "PhysicalProperties"
+Ray = "Ray"
+Rect2D = "Rect"
+RefType = "Ref"
+SecurityCapabilities = "SecurityCapabilities"
+UDim = "UDim"
+UDim2 = "UDim2"
+Vector2 = "Vector2"
+Vector3 = "Vector3"
+Vector3int16 = "Vector3int16"
+
+# Saved properties Luau can't read, held by a readable property under another name (probe 1, #3). Pull reads and
+# writes the readable one.
+[twins]
+"BasePart.Color3uint8" = "Color"
+"BasePart.size" = "Size"
+"BasePart.MaterialVariantSerialized" = "MaterialVariant"
+"Part.shape" = "Shape"
+"Model.WorldPivotData" = "WorldPivot"
+"Humanoid.Health_XML" = "Health"
+"WeldConstraint.Part0Internal" = "Part0"
+"WeldConstraint.Part1Internal" = "Part1"
+
+# Saved values Luau reaches only through a method. The plugin has a reader for each (tools/sync/studio/main.luau),
+# and the value is written as a property of the given disk type.
+[methods]
+"Model.ScaleFactor" = "float"
+
+# Classes that start from a model file of the instance alone (decision 0011): their saved data Luau can't read or
+# write (a MeshPart's mesh and collision data) travels in `<name>.rbxm`.
+[models]
+classes = ["MeshPart"]
+
+# Saved properties forge leaves in the place file, with why. Pull doesn't report them. Any other saved property it
+# can't read is reported, so nothing is dropped without a word.
+[left_in_place]
+"LuaSourceContainer.ScriptGuid" = "Studio's own id for a script; unreadable, and made new on every copy"
+"FormFactorPart.formFactorRaw" = "held by FormFactor, which is deprecated; Studio sets it from the part's shape"
+"Model.ModelMeshData" = "Studio's cached mesh of the model; unreadable and rebuilt by Studio"
+"Model.ModelMeshCFrame" = "part of the cached mesh of the model"
+"Model.ModelMeshSize" = "part of the cached mesh of the model"
+"Model.NeedsPivotMigration" = "a one-time upgrade flag Studio clears itself"
+"WeldConstraint.CFrame0" = "Studio's internal weld offset, unreadable; Studio recomputes it from the parts"
+"WeldConstraint.State" = "Studio's internal weld state, unreadable"
+"Humanoid.InternalBodyScale" = "unreadable; set by Studio from the avatar's scale values"
+"Humanoid.InternalHeadScale" = "unreadable; set by Studio from the avatar's scale values"
