@@ -39,3 +39,13 @@ The options compared:
 
 - #66 adds the disk-owned tree and the package reader; it needs #72 so packages and a game's code share file names.
 - Switching from Wally to pesde later changes nothing in forge.
+
+## Added in #66 (2026-11-12)
+
+- A packages tree is a `[[sync]]` with `kind = "packages"`. A separate `[[packages]]` list was the other option; one
+  list keeps the overlap checks in one place and leaves room for other kinds (#67).
+- A push writes a packages tree's script text by setting `Source` as well as through `ScriptEditorService`. Decision
+  0005 writes text only through `ScriptEditorService`, because `Source` can't be trusted when *reading*. With
+  collaborative editing on, that write lands as a draft: `Source` stayed empty, and `require` of a pushed Matter failed
+  in Studio until the drafts were committed by hand. Setting `Source` from the plugin works and commits the text, as
+  Rojo's writes do. Only packages trees do it: nobody edits them in Studio, and every collaborator needs them.

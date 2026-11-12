@@ -231,8 +231,9 @@ local function remodel(id: number, b64: string)
 end
 
 -- Carries out one tree's operations. New instances are numbered per tree (their ids in that tree's files), so each
--- tree keeps its own table of them.
-local function runTree(ops: { Json })
+-- tree keeps its own table of them. `commitText` (packages trees, decision 0021) sets `Source` itself, so the text is
+-- committed for every collaborator and `require` at once, as Rojo's is, instead of landing as a draft.
+local function runTree(ops: { Json }, commitText: boolean)
 	local built: Built = {}
 	local later: { () -> () } = {}
 	local roots: { { inst: Instance, parent: Json } } = {}
@@ -274,8 +275,12 @@ local function runTree(ops: { Json })
 	for _, r in roots do
 		r.inst.Parent = target(r.parent, built)
 	end
-	-- Script text only through ScriptEditorService (decision 0005), once the scripts are in the place.
+	-- Script text through ScriptEditorService (decision 0005), once the scripts are in the place.
 	for _, s in sources do
+		if commitText then
+			(s.inst :: any).Source = s.text
+		end
+		-- The editor too, so a draft left on a committed script is replaced rather than kept beside it.
 		ScriptEditorService:UpdateSourceAsync(s.inst :: LuaSourceContainer, function()
 			return s.text
 		end)
@@ -289,9 +294,9 @@ local function runTree(ops: { Json })
 end
 
 -- Carries out every tree's operations. Errors leave the work half done; `write.apply` cancels it.
-local function run(trees: { { ops: { Json } } })
+local function run(trees: { { ops: { Json }, commitText: boolean? } })
 	for _, tree in trees do
-		runTree(tree.ops)
+		runTree(tree.ops, tree.commitText == true)
 	end
 end
 
@@ -350,7 +355,7 @@ function write.check(request: any): Json
 end
 
 -- Applies a push as one undo step. Returns nothing; errors say why, with Studio put back as it was.
-function write.apply(trees: { { ops: { Json } } })
+function write.apply(trees: { { ops: { Json }, commitText: boolean? } })
 	local recording = ChangeHistoryService:TryBeginRecording("forge sync push")
 	if recording == nil then
 		error(

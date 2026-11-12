@@ -17,6 +17,11 @@ disk = "game/ui/hud"          # the folder it goes to, inside the repo
 [[sync]]
 studio = ["ReplicatedStorage", "Shared.v2"]   # a list of names, when a name has a dot in it
 disk = "game/shared"
+
+[[sync]]
+studio = "ReplicatedStorage.Packages"
+disk = "Packages"
+kind = "packages"             # what `wally install` made: disk owns it, forge only pushes (sync/packages.md)
 ```
 
 Rules, checked whenever forge reads the file:
@@ -24,6 +29,7 @@ Rules, checked whenever forge reads the file:
 - A Studio path names something inside a service, not the whole service.
 - A disk path is a folder inside the repo: no `..`, no drive or leading `/`.
 - No two entries overlap, in Studio or on disk, so no file is written from two places.
+- `kind`, when given, is `"packages"`.
 - Unknown keys are errors, so a typo never silently does nothing.
 
 `forge config` prints the file forge found, with its place and trees.

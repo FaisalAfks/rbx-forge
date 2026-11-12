@@ -5,6 +5,9 @@
 //! reflection data for each. forge then chooses which properties to read (`crate::select`), so that choice lives
 //! in Rust and in `tools/sync/properties.toml`. The second reads the trees.
 //!
+//! A packages tree (`kind = "packages"`, decision 0021) is disk's: pull leaves it alone, and the others read its files
+//! the way Rojo does (`crate::packages`), given layout C's disk names so they match Studio's instances path for path.
+//!
 //! - `pull` writes them to disk. Every folder's changes are worked out and checked before any file is written, so a
 //!   refused pull changes nothing.
 //! - `status` says what's linked and lists scripts with an uncommitted draft.
@@ -25,8 +28,8 @@ use serde_json::{Value as Json, json};
 
 use crate::schema::Schema;
 use crate::settings::Settings;
-use crate::trees::{self, Game};
-use crate::{diff, disk, layout, push as plan, select, tree::Node, value::ValueType};
+use crate::trees::{self, Game, Kind, Tree};
+use crate::{diff, disk, layout, packages, push as plan, select, tree::Node, value::ValueType};
 
 /// A game and the link to the Studio that has its place open.
 pub struct Session {
@@ -191,6 +194,14 @@ pub async fn pull(cx: &Cx, settings: &Settings, force: bool) -> Result<()> {
     // Every folder's changes first, so a refusal (a folder forge didn't make, uncommitted changes) writes nothing.
     let mut work = Vec::new();
     for (tree, from) in session.game.trees.iter().zip(&studio.trees) {
+        if tree.kind == Kind::Packages {
+            say!(
+                "{} -> {}: packages, which disk owns: not pulled (`forge sync push` puts them in Studio)",
+                from.name,
+                tree.disk.display()
+            );
+            continue;
+        }
         let files =
             layout::write(&from.node, schema).with_context(|| format!("{} on disk", from.name))?;
         read_back(&from.name, &from.node, &files, schema)?;
@@ -226,11 +237,11 @@ pub async fn diff(cx: &Cx, settings: &Settings) -> Result<()> {
     let mut total = 0;
     for (tree, from) in session.game.trees.iter().zip(&studio.trees) {
         let folder = session.game.root.join(&tree.disk);
-        if !folder.join("_.toml").is_file() {
-            say!("{} -> {}: not pulled yet", from.name, tree.disk.display());
+        if let Some(why) = missing(tree.kind, &folder) {
+            say!("{} -> {}: {why}", from.name, tree.disk.display());
             continue;
         }
-        let changes = changes(&from.node, &folder, schema)
+        let changes = changes(tree.kind, &from.node, &folder, schema)
             .with_context(|| format!("can't diff {}", from.name))?;
         total += changes.len();
         if changes.is_empty() {
@@ -256,11 +267,46 @@ pub async fn diff(cx: &Cx, settings: &Settings) -> Result<()> {
 }
 
 /// The changes from a tree's folder to Studio's copy. Both sides are read as files, so disk names and values match.
-pub fn changes(studio: &Node, folder: &Path, schema: &Schema) -> Result<Vec<diff::Change>> {
-    let on_disk =
-        layout::read(&layout::read_dir(folder)?, schema).context("reading the files on disk")?;
+pub fn changes(
+    kind: Kind,
+    studio: &Node,
+    folder: &Path,
+    schema: &Schema,
+) -> Result<Vec<diff::Change>> {
+    let on_disk = disk_tree(kind, &studio.name, folder, schema)?;
     let in_studio = layout::read(&layout::write(studio, schema)?, schema)?;
     diff::diff(&on_disk, &in_studio)
+}
+
+/// A tree as its folder has it, with layout C's disk names, so it lines up with Studio's copy path for path. A
+/// packages tree is read the way Rojo reads it, then written and read in layout C in memory to get those names.
+pub fn disk_tree(kind: Kind, name: &str, folder: &Path, schema: &Schema) -> Result<Node> {
+    match kind {
+        Kind::Synced => {
+            layout::read(&layout::read_dir(folder)?, schema).context("reading the files on disk")
+        }
+        Kind::Packages => {
+            let node = packages::read(folder, name)?;
+            layout::read(&layout::write(&node, schema)?, schema)
+                .with_context(|| format!("giving {} layout C's names", folder.display()))
+        }
+    }
+}
+
+/// Why a tree's folder has nothing to compare yet, if it hasn't.
+pub fn missing(kind: Kind, folder: &Path) -> Option<&'static str> {
+    match kind {
+        Kind::Synced if !folder.join("_.toml").is_file() => Some("not pulled yet"),
+        Kind::Packages if !folder.is_dir() => {
+            Some("no packages yet: run `wally install` (or `pesde install`)")
+        }
+        _ => None,
+    }
+}
+
+/// The tree's top name: the last name of its Studio path.
+fn top_name(tree: &Tree) -> &str {
+    tree.studio.last().map_or("", String::as_str)
 }
 
 /// Builds a copy of each tree (or only `only`, by Studio path or folder) from its files, reads the copy and compares
@@ -282,9 +328,16 @@ pub async fn check(cx: &Cx, settings: &Settings, only: Option<&str>) -> Result<(
     let schema = &studio.selection.schema;
     let mut copies = Vec::new();
     let mut originals = Vec::new();
-    for from in &studio.trees {
-        let files = layout::write(&from.node, schema)?;
-        let on_disk = layout::read(&files, schema)?;
+    for (tree, from) in session.game.trees.iter().zip(&studio.trees) {
+        // A packages tree's original is its files: the check is that Studio builds them whole.
+        let on_disk = match tree.kind {
+            Kind::Synced => layout::read(&layout::write(&from.node, schema)?, schema)?,
+            Kind::Packages => {
+                let folder = session.game.root.join(&tree.disk);
+                disk_tree(tree.kind, top_name(tree), &folder, schema)
+                    .with_context(|| format!("can't read {}", from.name))?
+            }
+        };
         copies.push(plan::tree_json(&on_disk)?);
         originals.push(on_disk);
     }
@@ -371,14 +424,20 @@ pub async fn push(cx: &Cx, settings: &Settings, from: Option<&Path>) -> Result<(
     let mut drafts = Vec::new();
     for (tree, from_studio) in session.game.trees.iter().zip(&studio.trees) {
         let folder = base.join(&tree.disk);
-        if !folder.join("_.toml").is_file() {
+        // A backup holds every tree as Studio had it, in layout C, packages trees too.
+        let kind = if from.is_some() {
+            Kind::Synced
+        } else {
+            tree.kind
+        };
+        if let Some(why) = missing(kind, &folder) {
             bail!(
-                "{} has no files at {} to push: pull it first",
+                "{} has no files at {} to push: {why}",
                 from_studio.name,
                 folder.display()
             );
         }
-        let on_disk = layout::read(&layout::read_dir(&folder)?, schema)
+        let on_disk = disk_tree(kind, top_name(tree), &folder, schema)
             .with_context(|| format!("can't read {}", folder.display()))?;
         let paths = layout::disk_paths(&from_studio.node, schema);
         let p = plan::plan(&from_studio.node, paths, &on_disk)
@@ -394,7 +453,7 @@ pub async fn push(cx: &Cx, settings: &Settings, from: Option<&Path>) -> Result<(
         total.added += p.added;
         total.removed += p.removed;
         total.moved += p.moved;
-        trees.push(json!({ "ops": p.ops }));
+        trees.push(json!({ "ops": p.ops, "commitText": tree.kind == Kind::Packages }));
         total.ops.extend(p.ops);
     }
     if total.is_empty() {

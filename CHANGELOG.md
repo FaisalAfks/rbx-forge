@@ -19,6 +19,11 @@
   folder as `init.luau` (or `init.server.luau`, `init.client.luau`). A plain script is just its file, with no section.
   Files in forge 0.1's names are refused with a hint; one `forge sync pull` rewrites a game's trees. Names `init`, or
   ending in `.server` or `.client`, are escaped (#72)
+- Packages from Wally or pesde (decision 0021, `docs/sync/packages.md`): a `[[sync]]` with `kind = "packages"` reads
+  what `wally install` or `pesde install` made the way Rojo does (nested `default.project.json` with `$path`, init
+  files, `.lua` and `.luau`) and puts the same instances in Studio. Disk owns it: pull leaves it alone, push, diff and
+  check work on it, and watch pushes it one way. Its script text is committed, not left as drafts, so `require` works
+  at once. Files Rojo would make other instances from are refused by name (#66)
 
 ## 0.1.1 - 2026-11-12
 

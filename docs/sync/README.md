@@ -5,7 +5,8 @@ small TOML files, one folder per instance that has children. It reads and writes
 and changes nothing in Studio without your say-so.
 
 This page takes a game from nothing to synced. Each command's page has the details: [pull](pull.md), [diff](diff.md),
-[push](push.md), [check](check.md), [watch](watch.md), and the file format in [format.md](format.md).
+[push](push.md), [check](check.md), [watch](watch.md), the file format in [format.md](format.md), and Wally or pesde
+packages in [packages.md](packages.md).
 
 ## 1. Install forge (once per PC)
 

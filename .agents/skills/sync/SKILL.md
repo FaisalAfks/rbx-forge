@@ -37,3 +37,5 @@ don't `--force` unless the person said so.
 - Scripts with an uncommitted draft: what's on disk is the editor's text; collaborators get the committed text until
   the person commits the draft in Studio's Drafts window. Mention it when a script you touch has one.
 - `.forge/` holds backups and watch's state; it's never committed.
+- A tree with `kind = "packages"` (`docs/sync/packages.md`) is what `wally install` or `pesde install` made: never edit
+  it, in its folder or in Studio. Change `wally.toml`, install, then push.

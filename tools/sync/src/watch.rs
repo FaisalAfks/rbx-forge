@@ -8,6 +8,9 @@
 //! both changed differently is held as a clash until a side is picked; everything else keeps syncing.
 //!
 //! forge's own writes come back as changes too, and merge to nothing, since values are compared, not flags.
+//!
+//! A packages tree (decision 0021) goes one way: disk owns it, so nothing is merged or written into its folder. When
+//! its files or its copy in Studio change, Studio gets a push of the files, which puts back any edit made in Studio.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -18,9 +21,11 @@ use forge_core::{Cx, client, say};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::commands::{Session, print_drafts};
+use crate::commands::{Session, StudioTree, print_drafts};
 use crate::merge::{self, Clash, Flat};
 use crate::settings::Settings;
+use crate::tree::Node;
+use crate::trees::Kind;
 use crate::{diff, disk, layout, push as plan};
 
 /// How often the loop looks for trees that have gone quiet.
@@ -52,6 +57,7 @@ struct Pick {
 struct Tree {
     name: String,
     folder: PathBuf,
+    kind: Kind,
     /// The state Studio and the files last agreed on.
     base: Flat,
     /// The last copies seen on each side, which a pick takes its value from.
@@ -69,13 +75,10 @@ pub async fn watch(cx: &Cx, settings: &Settings) -> Result<()> {
     let mut trees = Vec::new();
     for (t, from) in session.game.trees.iter().zip(&studio.trees) {
         let folder = session.game.root.join(&t.disk);
-        if !folder.join("_.toml").is_file() {
-            bail!(
-                "{} has no files yet: run `forge sync pull` first, then watch",
-                from.name
-            );
+        if let Some(why) = crate::commands::missing(t.kind, &folder) {
+            bail!("{} has no files to watch: {why}", from.name);
         }
-        let changes = crate::commands::changes(&from.node, &folder, &schema)?;
+        let changes = crate::commands::changes(t.kind, &from.node, &folder, &schema)?;
         if !changes.is_empty() {
             bail!(
                 "{} differs between Studio and its files ({} differences, `forge sync diff` lists them): run \
@@ -91,6 +94,7 @@ pub async fn watch(cx: &Cx, settings: &Settings) -> Result<()> {
         trees.push(Tree {
             name: from.name.clone(),
             folder,
+            kind: t.kind,
             base: flat.clone(),
             studio: flat.clone(),
             disk: flat,
@@ -185,6 +189,10 @@ async fn reconcile(
     let schema = &studio.selection.schema;
     let from = &studio.trees[0];
     let t = &mut trees[i];
+    if t.kind == Kind::Packages {
+        let target = crate::commands::disk_tree(t.kind, &from.node.name, &t.folder, schema)?;
+        return send(session, settings, i, from, &target, schema, true).await;
+    }
     let in_studio = merge::flatten(&layout::read(&layout::write(&from.node, schema)?, schema)?)?;
     let on_disk = merge::flatten(
         &layout::read(&layout::read_dir(&t.folder)?, schema)
@@ -207,35 +215,9 @@ async fn reconcile(
 
     // Studio: a push of what it's missing, as one undo step.
     let target = merge::unflatten(&m.to_studio)?;
-    let paths = layout::disk_paths(&from.node, schema);
-    let push = plan::plan(&from.node, paths, &target)?;
-    if !push.is_empty() {
-        let in_studio_read = layout::read(&layout::write(&from.node, schema)?, schema)?;
-        let lines: Vec<String> = diff::diff(&in_studio_read, &target)?
-            .iter()
-            .map(|c| format!("  {}", c.push_line()))
-            .collect();
-        let summary = format!(
-            "{} changed, {} added, {} removed, {} moved",
-            push.changed, push.added, push.removed, push.moved
-        );
-        let request = json!({
-            "pushTrees": [{ "ops": push.ops }],
-            "summary": summary,
-            "changes": push.changed + push.added + push.removed + push.moved,
-            "lines": lines,
-            "drafts": [],
-            "timeoutMs": settings.sync.confirm_timeout_ms,
-        });
-        let wait = settings.sync.confirm_timeout_ms + settings.server.request_timeout_ms;
-        let reply = session.ask_only_for(i, "push", request, Some(wait)).await?;
-        say!(
-            "{} -> Studio: {summary} ({})",
-            t.name,
-            reply["result"].as_str().unwrap_or("?")
-        );
-    }
+    send(session, settings, i, from, &target, schema, false).await?;
 
+    let t = &mut trees[i];
     t.base = m.base;
     t.studio = in_studio;
     t.disk = on_disk;
@@ -256,6 +238,49 @@ async fn reconcile(
         let lines = clash_lines(&held(trees));
         session.ask("clashes", json!({ "lines": lines })).await?;
     }
+    Ok(())
+}
+
+/// Pushes what makes tree `i` in Studio match `target`, as one undo step, if anything differs. `commit_text` is for
+/// packages trees: their script text is committed, not left as drafts.
+async fn send(
+    session: &mut Session,
+    settings: &Settings,
+    i: usize,
+    from: &StudioTree,
+    target: &Node,
+    schema: &crate::schema::Schema,
+    commit_text: bool,
+) -> Result<()> {
+    let paths = layout::disk_paths(&from.node, schema);
+    let push = plan::plan(&from.node, paths, target)?;
+    if push.is_empty() {
+        return Ok(());
+    }
+    let in_studio_read = layout::read(&layout::write(&from.node, schema)?, schema)?;
+    let lines: Vec<String> = diff::diff(&in_studio_read, target)?
+        .iter()
+        .map(|c| format!("  {}", c.push_line()))
+        .collect();
+    let summary = format!(
+        "{} changed, {} added, {} removed, {} moved",
+        push.changed, push.added, push.removed, push.moved
+    );
+    let request = json!({
+        "pushTrees": [{ "ops": push.ops, "commitText": commit_text }],
+        "summary": summary,
+        "changes": push.changed + push.added + push.removed + push.moved,
+        "lines": lines,
+        "drafts": [],
+        "timeoutMs": settings.sync.confirm_timeout_ms,
+    });
+    let wait = settings.sync.confirm_timeout_ms + settings.server.request_timeout_ms;
+    let reply = session.ask_only_for(i, "push", request, Some(wait)).await?;
+    say!(
+        "{} -> Studio: {summary} ({})",
+        from.name,
+        reply["result"].as_str().unwrap_or("?")
+    );
     Ok(())
 }
 
