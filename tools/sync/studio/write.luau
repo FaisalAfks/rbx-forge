@@ -43,7 +43,7 @@ local function target(ref: Json, built: Built): Instance
 	if type(ref) == "table" and ref.id ~= nil then
 		return read.instance(ref.id)
 	elseif type(ref) == "table" and ref.new ~= nil then
-		local inst = built[ref.new]
+		local inst: Instance? = built[ref.new]
 		if inst == nil then
 			error(`the push refers to new instance {ref.new}, which it doesn't build`)
 		end
@@ -135,6 +135,8 @@ local function decode(ty: string, v: Json, current: any, built: Built): any
 		for _, name in v do
 			table.insert(caps, (Enum.SecurityCapability :: any)[name])
 		end
+		-- selene's Roblox list doesn't have SecurityCapabilities yet; Studio does.
+		-- selene: allow(undefined_variable)
 		return SecurityCapabilities.new(table.unpack(caps))
 	elseif ty == "UDim" then
 		return UDim.new(num(v[1]), v[2])
@@ -151,8 +153,8 @@ local function decode(ty: string, v: Json, current: any, built: Built): any
 end
 
 local function set(inst: Instance, name: string, ty: string, v: Json, built: Built)
-	local current = (inst :: any)[name]
-	;(inst :: any)[name] = decode(ty, v, current, built)
+	local dynamic: any = inst
+	dynamic[name] = decode(ty, v, dynamic[name], built)
 end
 
 -- An attribute's type as `typeof` names it, as a disk type the decoder knows.
@@ -260,9 +262,9 @@ local function run(trees: { { ops: { Json } } })
 		elseif kind == "set" then
 			set(read.instance(op.id), op.name, op.type, op.value, built)
 		elseif kind == "reset" then
-			local inst = read.instance(op.id)
-			local fresh = Instance.new(inst.ClassName :: any)
-			;(inst :: any)[op.name] = (fresh :: any)[op.name]
+			local inst: any = read.instance(op.id)
+			local fresh: any = Instance.new(inst.ClassName)
+			inst[op.name] = fresh[op.name]
 			fresh:Destroy()
 		elseif kind == "attribute" then
 			attribute(read.instance(op.id), op.name, op.value, built)
@@ -295,12 +297,14 @@ end
 function write.apply(trees: { { ops: { Json } } })
 	local recording = ChangeHistoryService:TryBeginRecording("forge sync push")
 	if recording == nil then
-		error("Studio is in the middle of another change (or a playtest), so the push can't be one undo step: try again")
+		error(
+			"Studio is in the middle of another change (or a playtest), so the push can't be one undo step: try again"
+		)
 	end
-	local ok, err = pcall(run, trees)
-	if not ok then
+	local result = { pcall(run, trees) }
+	if not result[1] then
 		ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)
-		error(`the push failed, and Studio is as it was: {err}`)
+		error(`the push failed, and Studio is as it was: {result[2]}`)
 	end
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 end

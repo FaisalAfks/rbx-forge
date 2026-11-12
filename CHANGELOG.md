@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `forge sync push` makes Studio match the files, after Apply is clicked in forge's window in Studio (#36,
+  `docs/sync/push.md`). forge plans it in Rust: instances added, removed and moved, values set or reset, attributes,
+  tags, script text and model files. The plugin shows the plan and applies it as one undo step, cancelled whole if
+  anything fails. What it replaces is backed up under `.forge/backup/<time>/`, and `forge sync push --from` puts a
+  backup back
+
 - `forge sync diff` lists what differs between Studio and the files, one line per change (#35, `docs/sync/diff.md`):
   instances added or removed (with how many below them), subtrees moved or renamed, changed properties, attributes
   and tags with both values, scripts with the lines added and removed, and changed model files. A command whose

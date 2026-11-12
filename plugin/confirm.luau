@@ -43,7 +43,7 @@ end
 
 local function button(parent: Instance, text: string, main: boolean, x: number): TextButton
 	local b = Instance.new("TextButton")
-	b.Size = UDim2.new(0, 96, 0, 28)
+	b.Size = UDim2.fromOffset(96, 28)
 	b.Position = UDim2.new(1, x, 0.5, -14)
 	b.Font = Enum.Font.SourceSansBold
 	b.TextSize = 15
@@ -91,7 +91,7 @@ function confirm.ask(plugin: Plugin, ask: Ask): string
 	root.Parent = w
 
 	local list = Instance.new("ScrollingFrame")
-	list.Position = UDim2.new(0, 8, 0, 8)
+	list.Position = UDim2.fromOffset(8, 8)
 	list.Size = UDim2.new(1, -16, 1, -60)
 	list.BackgroundColor3 = theme(Enum.StudioStyleGuideColor.InputFieldBackground)
 	list.BorderSizePixel = 0

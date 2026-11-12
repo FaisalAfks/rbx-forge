@@ -19,7 +19,7 @@ local lastRead: { [number]: Instance } = {}
 
 -- The instance the last read sent as `id`.
 function read.instance(id: number): Instance
-	local inst = lastRead[id]
+	local inst: Instance? = lastRead[id]
 	if inst == nil or inst.Parent == nil then
 		error(`instance {id} from forge's last read is gone from Studio: the tree changed, run the command again`)
 	end
