@@ -387,6 +387,7 @@ pub async fn push(
     let request = json!({
         "pushTrees": trees,
         "summary": summary,
+        "changes": total.changed + total.added + total.removed + total.moved,
         "lines": lines,
         "drafts": drafts,
         "timeoutMs": settings.sync.confirm_timeout_ms,
