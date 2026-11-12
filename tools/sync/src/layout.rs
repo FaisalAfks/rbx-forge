@@ -1,8 +1,12 @@
-//! Layout C (decision 0008): a tree as files and back. An instance with children is a folder with a `_.toml`
-//! (its own class, properties, attributes and tags, plus one section per child without children). A script's text
-//! is `<name>.luau` and a MeshPart's model is `<name>.rbxm`, both in the parent's folder (the root's are `_.luau` and
-//! `_.rbxm` in its own folder). Every file is written whole, in one fixed form (decision 0015), so the same tree is
-//! always the same bytes. `docs/sync/format.md` is the reference.
+//! Layout C (decisions 0008 and 0020): a tree as files and back. An instance with children is a folder with a
+//! `_.toml` (its own class, properties, attributes and tags, plus one section per child without children).
+//!
+//! Scripts are named the way Luau tools read them: `Name.luau` is a ModuleScript, `Name.server.luau` a Script and
+//! `Name.client.luau` a LocalScript, in the parent's folder; a script with children keeps its text in its own folder
+//! as `init.luau` (`init.server.luau`, `init.client.luau`). A script gets a section, or its folder a `_.toml`, only
+//! when there's more to say than its file name does; a section that is written always names its class. A MeshPart's
+//! model is `<name>.rbxm` in the parent's folder (the root's is `_.rbxm` in its own). Every file is written whole, in
+//! one fixed form (decision 0015), so the same tree is always the same bytes. `docs/sync/format.md` is the reference.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -19,6 +23,38 @@ use crate::value::{RefTarget, Value};
 pub type Files = BTreeMap<String, Vec<u8>>;
 
 const PROPS_FILE: &str = "_.toml";
+
+/// The stem of a script's own file in its folder.
+const INIT: &str = "init";
+
+/// Each script class and the suffix its file name carries before `.luau`.
+const SCRIPT_SUFFIXES: [(&str, &str); 3] = [
+    ("ModuleScript", ""),
+    ("Script", ".server"),
+    ("LocalScript", ".client"),
+];
+
+/// What a file in v0.1's layout gets, pointing at the fix.
+const OLD_LAYOUT: &str = "forge 0.1 named script files differently: run `forge sync pull` to rewrite them (decision 0020)";
+
+/// The suffix a script class's file name carries, if forge writes that class's text.
+fn script_suffix(class: &str) -> Option<&'static str> {
+    SCRIPT_SUFFIXES
+        .iter()
+        .find(|(c, _)| *c == class)
+        .map(|(_, s)| *s)
+}
+
+/// A `.luau` file's stem split into its instance's disk name and the class the name gives (`Foo.server` is a Script
+/// with disk name `Foo`). Names that end in `.server` or `.client` are escaped (`names::base`), so this can't misread.
+fn script_file(stem: &str) -> (&str, &'static str) {
+    for (class, suffix) in SCRIPT_SUFFIXES.iter().skip(1) {
+        if let Some(base) = stem.strip_suffix(suffix) {
+            return (base, class);
+        }
+    }
+    (stem, SCRIPT_SUFFIXES[0].0)
+}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Writing
@@ -130,10 +166,15 @@ fn write_folder(
     keys: &KeyMap,
     files: &mut Files,
 ) -> Result<()> {
+    // A script's own text is its folder's `init` file. The root's model is its folder's `_.rbxm`, since it has no
+    // parent folder in the tree.
+    add_source(node, dir, INIT, files)?;
     if key.is_none() {
-        // The root's own text and model live in its own folder; it has no parent folder in the tree.
-        add_extras(node, dir, "_", files);
+        add_model(node, dir, "_", files);
     }
+    // A script's folder needs a `_.toml` only when its file name doesn't say everything; the root always has one, with
+    // its name, and it marks the folder as forge's.
+    let mut needed = key.is_none() || !plain_script(node, key);
     let mut toml = body(node, key, keys)?;
     if !node.attributes.is_empty() {
         toml.push_str("\n[attributes]\n");
@@ -147,30 +188,60 @@ fn write_folder(
     leaves.sort_by(|a, b| keys.key(a.id).cmp(keys.key(b.id)));
     for leaf in leaves {
         let k = keys.key(leaf.id);
+        add_source(leaf, dir, k, files)?;
+        add_model(leaf, dir, k, files);
+        if plain_script(leaf, Some(k)) {
+            continue;
+        }
+        needed = true;
         toml.push_str(&format!("\n[{}]\n", text::key(k)));
         toml.push_str(&body(leaf, Some(k), keys)?);
         if !leaf.attributes.is_empty() {
             toml.push_str(&format!("\n[{}.attributes]\n", text::key(k)));
             toml.push_str(&attributes(leaf)?);
         }
-        add_extras(leaf, dir, k, files);
     }
-    files.insert(join(dir, PROPS_FILE), toml.into_bytes());
+    if needed {
+        files.insert(join(dir, PROPS_FILE), toml.into_bytes());
+    }
     for child in node.children.iter().filter(|c| !c.children.is_empty()) {
         let k = keys.key(child.id);
-        add_extras(child, dir, k, files);
+        add_model(child, dir, k, files);
         write_folder(child, &join(dir, k), Some(k), keys, files)?;
     }
     Ok(())
 }
 
-fn add_extras(node: &Node, dir: &str, stem: &str, files: &mut Files) {
-    if let Some(source) = &node.source {
-        files.insert(
-            join(dir, &format!("{stem}.luau")),
-            source.clone().into_bytes(),
-        );
-    }
+/// A script whose file name says all there is: its class and its name, and nothing else set.
+fn plain_script(node: &Node, key: Option<&str>) -> bool {
+    node.source.is_some()
+        && script_suffix(&node.class).is_some()
+        && key == Some(node.name.as_str())
+        && node.properties.is_empty()
+        && node.attributes.is_empty()
+        && node.tags.is_empty()
+}
+
+/// A script's text, as `<stem><suffix>.luau` in `dir`.
+fn add_source(node: &Node, dir: &str, stem: &str, files: &mut Files) -> Result<()> {
+    let Some(source) = &node.source else {
+        return Ok(());
+    };
+    let suffix = script_suffix(&node.class).ok_or_else(|| {
+        anyhow!(
+            "{} {:?} has script text, but forge writes text only for Script, LocalScript and ModuleScript",
+            node.class,
+            node.name
+        )
+    })?;
+    files.insert(
+        join(dir, &format!("{stem}{suffix}.luau")),
+        source.clone().into_bytes(),
+    );
+    Ok(())
+}
+
+fn add_model(node: &Node, dir: &str, stem: &str, files: &mut Files) {
     if let Some(model) = &node.model {
         files.insert(join(dir, &format!("{stem}.rbxm")), model.clone());
     }
@@ -274,22 +345,73 @@ fn read_folder(
             props_path.clone()
         }
     };
-    let bytes = files
-        .get(&props_path)
-        .ok_or_else(|| anyhow!("{} is missing: every folder needs one", where_()))?;
-    let table: toml::Table = std::str::from_utf8(bytes)
-        .map_err(|_| anyhow!("isn't UTF-8"))
-        .and_then(|t| t.parse().map_err(|e| anyhow!("{e}")))
-        .with_context(where_)?;
-    let (mut node, leaves) = read_body(&table, key, schema, true).with_context(where_)?;
-    node.id = next(ids);
+    let at = |file: &str| join(dir, file);
     let (folders, own) = listing(files, dir);
-    for (k, t) in leaves {
-        let (mut leaf, _) = read_body(&t, Some(&k), schema, false)
-            .with_context(|| format!("{}: [{k}]", where_()))?;
-        leaf.id = next(ids);
-        node.children.push(leaf);
+    if key.is_none() && own.iter().any(|f| f == "_.luau") {
+        bail!(
+            "{} holds the tree's script text: {OLD_LAYOUT}",
+            at("_.luau")
+        );
     }
+    // The folder's own script, if it's a script: `init.luau`, `init.server.luau` or `init.client.luau`.
+    let mut init: Option<(&String, &'static str)> = None;
+    for file in &own {
+        let Some(stem) = file.strip_suffix(".luau") else {
+            continue;
+        };
+        let (base, class) = script_file(stem);
+        if base == INIT {
+            if let Some((other, _)) = init {
+                bail!(
+                    "{} and {} are both the folder's own script",
+                    at(other),
+                    at(file)
+                );
+            }
+            init = Some((file, class));
+        }
+    }
+
+    let mut node = match files.get(&props_path) {
+        Some(bytes) => {
+            let table: toml::Table = std::str::from_utf8(bytes)
+                .map_err(|_| anyhow!("isn't UTF-8"))
+                .and_then(|t| t.parse().map_err(|e| anyhow!("{e}")))
+                .with_context(where_)?;
+            let (mut node, leaves) = read_body(&table, key, schema, true).with_context(where_)?;
+            node.id = next(ids);
+            if let Some((file, class)) = init
+                && node.class != class
+            {
+                bail!(
+                    "{} says class {}, but {} is a {class}'s file",
+                    where_(),
+                    node.class,
+                    at(file)
+                );
+            }
+            for (k, t) in leaves {
+                let (mut leaf, _) = read_body(&t, Some(&k), schema, false)
+                    .with_context(|| format!("{}: [{k}]", where_()))?;
+                leaf.id = next(ids);
+                node.children.push(leaf);
+            }
+            node
+        }
+        // A script's folder with nothing more to say than its file names has no `_.toml`.
+        None => match (init, key) {
+            (Some((_, class)), Some(k)) => Node {
+                class: class.to_string(),
+                name: k.to_string(),
+                key: Some(k.to_string()),
+                id: next(ids),
+                ..Default::default()
+            },
+            _ => bail!("{} is missing: every folder needs one", where_()),
+        },
+    };
+
+    let mut folder_keys = Vec::new();
     for f in &folders {
         if f.starts_with('.') {
             continue;
@@ -299,15 +421,56 @@ fn read_folder(
         }
         node.children
             .push(read_folder(files, &join(dir, f), Some(f), schema, ids)?);
+        folder_keys.push(f.as_str());
     }
     for file in own
         .iter()
         .filter(|f| *f != PROPS_FILE && !f.starts_with('.'))
     {
-        let path = join(dir, file);
-        let (stem, ext) = file
-            .rsplit_once('.')
-            .ok_or_else(|| anyhow!("{path} isn't a file forge writes"))?;
+        let path = at(file);
+        let bytes = files[&path].clone();
+        if let Some(stem) = file.strip_suffix(".luau") {
+            let text = String::from_utf8(bytes).map_err(|_| anyhow!("{path} isn't UTF-8"))?;
+            let (base, class) = script_file(stem);
+            if base == INIT {
+                node.source = Some(text);
+                continue;
+            }
+            if folder_keys.contains(&base) {
+                bail!(
+                    "{path} is the text of {base}, which has a folder; its text belongs in that folder's init file: \
+                     {OLD_LAYOUT}"
+                );
+            }
+            match node
+                .children
+                .iter_mut()
+                .find(|c| c.key.as_deref() == Some(base))
+            {
+                Some(c) if c.source.is_some() => {
+                    bail!("{path}: {base} has two script files")
+                }
+                Some(c) if c.class != class => bail!(
+                    "{path} is a {class}'s file, but its section in {} says class {}: {OLD_LAYOUT}",
+                    where_(),
+                    c.class
+                ),
+                Some(c) => c.source = Some(text),
+                // A plain script is just its file: the name gives its class and its own name.
+                None => node.children.push(Node {
+                    class: class.to_string(),
+                    name: base.to_string(),
+                    key: Some(base.to_string()),
+                    id: next(ids),
+                    source: Some(text),
+                    ..Default::default()
+                }),
+            }
+            continue;
+        }
+        let Some(stem) = file.strip_suffix(".rbxm") else {
+            bail!("{path} isn't a file forge writes");
+        };
         let target = if stem == "_" && key.is_none() {
             &mut node
         } else {
@@ -321,15 +484,7 @@ fn read_folder(
                     )
                 })?
         };
-        let bytes = files[&path].clone();
-        match ext {
-            "luau" => {
-                target.source =
-                    Some(String::from_utf8(bytes).map_err(|_| anyhow!("{path} isn't UTF-8"))?)
-            }
-            "rbxm" => target.model = Some(bytes),
-            _ => bail!("{path} isn't a file forge writes"),
-        }
+        target.model = Some(bytes);
     }
     node.children.sort_by(|a, b| a.key.cmp(&b.key));
     Ok(node)

@@ -1,6 +1,6 @@
 # How forge sync writes a tree on disk
 
-The reference for layout C (decision 0008). Code: `tools/sync/src/layout.rs`, `names.rs` and `value.rs`. Every file
+The reference for layout C (decisions 0008 and 0020). Code: `tools/sync/src/layout.rs`, `names.rs` and `value.rs`. Every file
 is written whole, in one fixed form (decision 0015), so the same tree always gives the same bytes and an unchanged
 pull changes no file. Comments in these files aren't kept.
 
@@ -12,9 +12,22 @@ Each synced tree (a `[[sync]]` in `forge.toml`) is a folder.
 |---|---|
 | An instance with children | a folder, holding its own `_.toml` |
 | An instance with no children | a section `[Name]` in its parent's `_.toml` |
-| A script's text | `Name.luau` in its parent's folder, byte for byte (CRLF, a BOM, a missing last newline all kept) |
+| A script's text | a `.luau` file named the way Luau tools read it (below), byte for byte (CRLF, a BOM, a missing last newline all kept) |
 | A MeshPart's model (decision 0011) | `Name.rbxm` in its parent's folder |
-| The tree's top instance | the folder itself; its text and model, if any, are `_.luau` and `_.rbxm` inside it |
+| The tree's top instance | the folder itself; its model, if any, is `_.rbxm` inside it, and its text is its `init` file |
+
+**Scripts** (decision 0020). The file name says the class:
+
+| Class | No children | With children |
+|---|---|---|
+| ModuleScript | `Name.luau` in its parent's folder | `Name/init.luau` |
+| Script | `Name.server.luau` in its parent's folder | `Name/init.server.luau` |
+| LocalScript | `Name.client.luau` in its parent's folder | `Name/init.client.luau` |
+
+A script whose file name says everything (its class, its real name, no properties, attributes or tags) has no section,
+and a script's folder with nothing more to say has no `_.toml`. When there's more, the section or `_.toml` is written
+as for any instance, `class` included, and the class has to match the file name. A Script's `RunContext` is a property
+like any other; the file name follows the class only. forge writes text only for these three classes.
 
 A `_.toml` holds, in this order:
 1. `class = "Frame"`.
@@ -31,7 +44,8 @@ its own moves from its parent's `_.toml` into a folder.
 
 Sibling order isn't stored. Neither folders nor TOML sections keep it, and UI order comes from `LayoutOrder`.
 
-Files and folders starting with `.` are skipped. Any other file forge didn't write is an error that names it.
+Files and folders starting with `.` are skipped. Any other file forge didn't write is an error that names it. A
+`.luau` file with no section is a script of the class its name gives.
 
 Pull also writes a `.gitattributes` with `* -text` into each synced folder, so git never changes the bytes above
 (`pull.md`).
@@ -41,10 +55,11 @@ Pull also writes a `.gitattributes` with `* -text` into each synced folder, so g
 An instance's disk name is its name, made safe:
 - These characters become `%XX` (their code in hex): `< > : " / \ | ? * % ~`, and control characters. So do:
   - a trailing space or dot (Windows drops them);
-  - the dot of a name ending in `.luau`, `.rbxm` or `.toml`, so it can't clash with forge's own files.
+  - the dot of a name ending in `.luau`, `.rbxm`, `.toml`, `.server` or `.client` (in any case), so it can't clash
+    with forge's own files or read as a script's class.
 - These get their first character escaped (`CON` becomes `%43ON`):
   - Windows device names (`CON`, `PRN`, `AUX`, `NUL`, `COM0`-`COM9`, `LPT0`-`LPT9`, with or without an extension);
-  - `_`;
+  - `_` and `init` (`init` in any case), the stems of a folder's own files;
   - `class`, `name`, `tags` and `attributes`;
   - any name that's a property of the parent's class. A TextButton's child named `Text` is `%54ext`, so it can't
     clash with the button's own `Text = "..."`.
@@ -124,7 +139,10 @@ Reading stops at the first problem and names the file, the key and the expected 
 Problems it catches:
 - unknown properties and wrong shapes;
 - a missing `_.toml`;
-- a `.luau` or `.rbxm` file with no instance to belong to;
+- an `.rbxm` file with no instance to belong to;
+- a script file whose name gives a different class than its section;
+- files in forge 0.1's layout (a tree's text in `_.luau`, a Script's text in `Name.luau`, a script's text beside its
+  folder), which say to run `forge sync pull` to rewrite them;
 - stray files;
 - the same name as both a section and a folder;
 - a class the schema doesn't know.

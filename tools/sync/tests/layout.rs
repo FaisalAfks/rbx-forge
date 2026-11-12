@@ -123,6 +123,7 @@ fn schema() -> Schema {
         "Script",
         class(Some("LuaSourceContainer"), &[("Disabled", T::Bool)]),
     );
+    add("LocalScript", class(Some("Script"), &[]));
     s
 }
 
@@ -555,8 +556,19 @@ fn scripts_models_and_names_land_where_documented() {
         files["Runner/Config.luau"],
         "\u{feff}return {\r\n\tx = 1,\r\n}".as_bytes()
     );
-    assert_eq!(files["Runner.luau"], b"print('run')\n");
-    assert_eq!(files["Main%2Eluau.luau"], b"");
+    // A script with children keeps its text in its own folder, named the way Luau tools read it (decision 0020).
+    assert_eq!(files["Runner/init.server.luau"], b"print('run')\n");
+    assert_eq!(files["Main%2Eluau.server.luau"], b"");
+    // Runner and its module have nothing to say beyond their file names: no section, no `_.toml`.
+    assert!(!files.contains_key("Runner/_.toml"), "{:?}", files.keys());
+    // Main has a property, so it keeps a section, with its class.
+    let root = text(&files, "_.toml");
+    assert!(
+        root.contains(
+            "[\"Main%2Eluau\"]\nclass = \"Script\"\nname = \"Main.luau\"\nDisabled = true\n"
+        ),
+        "{root}"
+    );
     assert_eq!(
         files["World/Rock.rbxm"],
         vec![0x3c, 0x72, 0x6f, 0x62, 0, 1, 2, 255]
@@ -659,8 +671,8 @@ fn bad_files_give_errors_that_name_the_file() {
     assert!(err(&f).contains("\"Sise\" isn't a property of Frame"));
 
     let mut f = good.clone();
-    f.insert("Bar/Stray.luau".into(), b"".to_vec());
-    assert!(err(&f).contains("Bar/Stray.luau"));
+    f.insert("Bar/Stray.rbxm".into(), b"".to_vec());
+    assert!(err(&f).contains("Bar/Stray.rbxm"));
 
     let mut f = good.clone();
     f.remove("World/_.toml");
@@ -717,4 +729,121 @@ fn the_plugin_json_goes_to_the_same_files() {
         layout::write(&tree, &s).unwrap(),
         layout::write(&from_json, &s).unwrap()
     );
+}
+
+fn file(files: &mut Files, path: &str, text: &str) {
+    files.insert(path.into(), text.as_bytes().to_vec());
+}
+
+#[test]
+fn script_files_say_their_class() {
+    let s = schema();
+    let mut files = Files::new();
+    file(
+        &mut files,
+        "_.toml",
+        "class = \"Folder\"\nname = \"Code\"\n",
+    );
+    file(&mut files, "Shared.luau", "return {}");
+    file(&mut files, "Boot.server.luau", "print(1)");
+    file(&mut files, "Input.client.luau", "print(2)");
+    file(&mut files, "Game/init.server.luau", "print(3)");
+    file(&mut files, "Game/Rules.luau", "return 1");
+    let tree = layout::read(&files, &s).unwrap();
+    let child = |name: &str| tree.children.iter().find(|c| c.name == name).unwrap();
+    assert_eq!(child("Shared").class, "ModuleScript");
+    assert_eq!(child("Boot").class, "Script");
+    assert_eq!(child("Input").class, "LocalScript");
+    assert_eq!(child("Game").class, "Script");
+    assert_eq!(child("Game").source.as_deref(), Some("print(3)"));
+    assert_eq!(child("Game").children[0].class, "ModuleScript");
+    // They write back as the same files.
+    assert_eq!(layout::write(&tree, &s).unwrap(), files);
+}
+
+#[test]
+fn scripts_named_like_forges_files_round_trip() {
+    let s = schema();
+    let mut ids = 0;
+    let mut script = |class: &str, name: &str| {
+        ids += 1;
+        Node {
+            id: ids,
+            class: class.into(),
+            name: name.into(),
+            source: Some(format!("-- {name}")),
+            ..Default::default()
+        }
+    };
+    let root = Node {
+        id: 100,
+        class: "Folder".into(),
+        name: "Code".into(),
+        children: vec![
+            script("ModuleScript", "init"),
+            script("ModuleScript", "Foo.server"),
+            script("Script", "Twin"),
+            script("ModuleScript", "Twin"),
+            script("LocalScript", "INIT"),
+        ],
+        ..Default::default()
+    };
+    let files = layout::write(&root, &s).unwrap();
+    assert!(
+        !files.keys().any(|k| k.to_lowercase().starts_with("init")),
+        "{:?}",
+        files.keys()
+    );
+    let back = layout::read(&files, &s).unwrap();
+    let mut names: Vec<(String, String)> = back
+        .children
+        .iter()
+        .map(|c| (c.class.clone(), c.name.clone()))
+        .collect();
+    names.sort();
+    let want: Vec<(String, String)> = [
+        ("LocalScript", "INIT"),
+        ("ModuleScript", "Foo.server"),
+        ("ModuleScript", "Twin"),
+        ("ModuleScript", "init"),
+        ("Script", "Twin"),
+    ]
+    .iter()
+    .map(|(c, n)| (c.to_string(), n.to_string()))
+    .collect();
+    assert_eq!(names, want);
+    assert_eq!(layout::write(&back, &s).unwrap(), files);
+}
+
+#[test]
+fn files_from_forge_0_1_say_to_pull_again() {
+    let s = schema();
+    let err = |files: &Files| format!("{:#}", layout::read(files, &s).unwrap_err());
+
+    // The tree's own text as `_.luau`.
+    let mut f = Files::new();
+    file(&mut f, "_.toml", "class = \"Script\"\nname = \"Main\"\n");
+    file(&mut f, "_.luau", "print(1)");
+    assert!(err(&f).contains("forge sync pull"), "{}", err(&f));
+
+    // A leaf Script as `Name.luau`, its section saying Script.
+    let mut f = Files::new();
+    file(
+        &mut f,
+        "_.toml",
+        "class = \"Folder\"\nname = \"Code\"\n\n[Boot]\nclass = \"Script\"\n",
+    );
+    file(&mut f, "Boot.luau", "print(1)");
+    assert!(err(&f).contains("forge sync pull"), "{}", err(&f));
+
+    // A script with children, its text beside its folder.
+    let mut f = Files::new();
+    file(&mut f, "_.toml", "class = \"Folder\"\nname = \"Code\"\n");
+    file(
+        &mut f,
+        "Runner/_.toml",
+        "class = \"ModuleScript\"\n\n[Part]\nclass = \"Folder\"\n",
+    );
+    file(&mut f, "Runner.luau", "return 1");
+    assert!(err(&f).contains("forge sync pull"), "{}", err(&f));
 }

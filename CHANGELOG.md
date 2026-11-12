@@ -12,6 +12,14 @@
   is described, and the MCP's instructions lost stray spaces
 - CI runs the Rust and Luau checks only when their code changes; the changelog has a section per tool
 
+### sync
+
+- **Breaking:** script files are named the way Luau tools read them (decision 0020): `Name.luau` is a ModuleScript,
+  `Name.server.luau` a Script, `Name.client.luau` a LocalScript, and a script with children keeps its text in its
+  folder as `init.luau` (or `init.server.luau`, `init.client.luau`). A plain script is just its file, with no section.
+  Files in forge 0.1's names are refused with a hint; one `forge sync pull` rewrites a game's trees. Names `init`, or
+  ending in `.server` or `.client`, are escaped (#72)
+
 ## 0.1.1 - 2026-11-12
 
 - `forge sync check` builds each tree's copy on its own: a tree plugins can't create (TextChatService's settings) is
