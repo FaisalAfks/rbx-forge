@@ -26,6 +26,35 @@ pub struct Tree {
     pub studio: Vec<String>,
     /// The folder on disk, relative to the game's root.
     pub disk: PathBuf,
+    pub kind: Kind,
+}
+
+/// Who owns a tree's files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Kind {
+    /// Both sides: pull writes the files in layout C, push and watch carry the files to Studio.
+    #[default]
+    Synced,
+    /// Disk alone (`kind = "packages"`, decision 0021): files `wally install` or `pesde install` made, read the way
+    /// Rojo reads them. forge pushes them and never writes into the folder.
+    Packages,
+}
+
+impl Kind {
+    /// How `forge config` and the commands name it, after the tree.
+    pub fn note(self) -> &'static str {
+        match self {
+            Kind::Synced => "",
+            Kind::Packages => " (packages: disk owns it)",
+        }
+    }
+}
+
+/// The values `kind` can take in forge.toml.
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum FileKind {
+    Packages,
 }
 
 #[derive(Deserialize)]
@@ -33,6 +62,7 @@ pub struct Tree {
 struct FileTree {
     studio: StudioPath,
     disk: String,
+    kind: Option<FileKind>,
 }
 
 /// Reads and checks a game's `[[sync]]` trees.
@@ -40,7 +70,13 @@ pub fn read(game: &CoreGame) -> Result<Game> {
     let trees = game
         .get::<Vec<FileTree>>(KEY)?
         .into_iter()
-        .map(|t| check_tree(t.studio.names(), &t.disk))
+        .map(|t| {
+            let kind = match t.kind {
+                None => Kind::Synced,
+                Some(FileKind::Packages) => Kind::Packages,
+            };
+            check_tree(t.studio.names(), &t.disk, kind)
+        })
         .collect::<Result<Vec<_>>>()?;
     check_no_overlap(&trees)?;
     Ok(Game {
@@ -67,7 +103,7 @@ impl StudioPath {
     }
 }
 
-fn check_tree(studio: Vec<String>, disk: &str) -> Result<Tree> {
+fn check_tree(studio: Vec<String>, disk: &str, kind: Kind) -> Result<Tree> {
     if studio.is_empty() || studio.iter().any(String::is_empty) {
         bail!("studio path {:?} has an empty name", studio.join("."));
     }
@@ -88,6 +124,7 @@ fn check_tree(studio: Vec<String>, disk: &str) -> Result<Tree> {
     Ok(Tree {
         studio,
         disk: disk_path,
+        kind,
     })
 }
 
@@ -141,6 +178,33 @@ mod tests {
         assert_eq!(g.trees[0].studio, ["StarterGui", "Hud"]);
         assert_eq!(g.trees[0].disk, PathBuf::from("game/ui/hud"));
         assert_eq!(g.trees[1].studio, ["ReplicatedStorage", "Shared.v2"]);
+    }
+
+    #[test]
+    fn reads_a_packages_tree() {
+        let g = game(
+            "place = 1
+[[sync]]
+studio = \"ReplicatedStorage.Packages\"
+disk = \"Packages\"
+kind = \"packages\"
+             [[sync]]
+studio = \"StarterGui.Hud\"
+disk = \"ui\"",
+        )
+        .unwrap();
+        assert_eq!(g.trees[0].kind, Kind::Packages);
+        assert_eq!(g.trees[1].kind, Kind::Synced);
+        assert!(
+            error(
+                "place = 1
+[[sync]]
+studio = \"A.B\"
+disk = \"a\"
+kind = \"rojo\""
+            )
+            .contains("unknown variant")
+        );
     }
 
     #[test]

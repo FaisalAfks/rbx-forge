@@ -9,6 +9,7 @@ pub mod layout;
 pub mod merge;
 pub mod names;
 pub mod number;
+pub mod packages;
 pub mod push;
 pub mod schema;
 pub mod select;

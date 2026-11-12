@@ -102,7 +102,14 @@ impl Tool for SyncTool {
         Ok(trees::read(game)?
             .trees
             .iter()
-            .map(|t| format!("{} -> {}", t.studio.join("."), t.disk.display()))
+            .map(|t| {
+                format!(
+                    "{} -> {}{}",
+                    t.studio.join("."),
+                    t.disk.display(),
+                    t.kind.note()
+                )
+            })
             .collect())
     }
 
