@@ -230,20 +230,15 @@ local function remodel(id: number, b64: string)
 	read.replace(id, new)
 end
 
--- Carries out every tree's operations. Errors leave the work half done; `write.apply` cancels it.
-local function run(trees: { { ops: { Json } } })
+-- Carries out one tree's operations. New instances are numbered per tree (their ids in that tree's files), so each
+-- tree keeps its own table of them.
+local function runTree(ops: { Json })
 	local built: Built = {}
 	local later: { () -> () } = {}
 	local roots: { { inst: Instance, parent: Json } } = {}
 	local sources: { Source } = {}
-	local all: { Json } = {}
-	for _, tree in trees do
-		for _, op in tree.ops do
-			table.insert(all, op)
-		end
-	end
 	-- New subtrees and replaced models first, so everything a value can point at exists.
-	for _, op in all do
+	for _, op in ops do
 		if op.op == "add" then
 			table.insert(roots, { inst = build(op.tree, built, later, sources), parent = op.parent })
 		elseif op.op == "model" then
@@ -253,7 +248,7 @@ local function run(trees: { { ops: { Json } } })
 	for _, f in later do
 		f()
 	end
-	for _, op in all do
+	for _, op in ops do
 		local kind = op.op
 		if kind == "move" then
 			local inst = read.instance(op.id)
@@ -286,16 +281,25 @@ local function run(trees: { { ops: { Json } } })
 		end)
 	end
 	-- Removed last: `Parent = nil` rather than Destroy, so undo can bring them back.
-	for _, op in all do
+	for _, op in ops do
 		if op.op == "remove" then
 			read.instance(op.id).Parent = nil
 		end
 	end
 end
 
+-- Carries out every tree's operations. Errors leave the work half done; `write.apply` cancels it.
+local function run(trees: { { ops: { Json } } })
+	for _, tree in trees do
+		runTree(tree.ops)
+	end
+end
+
 -- Builds a copy of each tree from the files (as `add` builds), in a scratch folder in ServerStorage, reads the copies
 -- with the same request as a read, and takes everything away again: the copies are made inside a recording that's
 -- cancelled, so the place and its undo history are as they were (decision 0011's round trip, as forge's own check).
+-- A tree that can't be copied (its class can't be created by plugins, like TextChatService's settings) is skipped with
+-- the reason, and the rest are checked.
 function write.check(request: any): Json
 	local recording = ChangeHistoryService:TryBeginRecording("forge sync check")
 	if recording == nil then
@@ -305,28 +309,37 @@ function write.check(request: any): Json
 		pcall(function()
 			local folder = Instance.new("Folder")
 			folder.Name = "forge check (removed when the check ends)"
-			local built: Built = {}
-			local later: { () -> () } = {}
-			local sources: { Source } = {}
-			local roots = {}
-			for _, tree in request.copies do
-				table.insert(roots, build(tree, built, later, sources))
-			end
-			for _, f in later do
-				f()
-			end
-			for _, root in roots do
-				root.Parent = folder
-			end
 			folder.Parent = game:GetService("ServerStorage")
-			for _, s in sources do
-				ScriptEditorService:UpdateSourceAsync(s.inst :: LuaSourceContainer, function()
-					return s.text
+			local roots, paths, kept, skipped = {}, {}, {}, {}
+			for i, tree in request.copies do
+				local built: Built = {}
+				local later: { () -> () } = {}
+				local sources: { Source } = {}
+				local ok, err = pcall(function()
+					local root = build(tree, built, later, sources)
+					for _, f in later do
+						f()
+					end
+					root.Parent = folder
+					for _, s in sources do
+						ScriptEditorService:UpdateSourceAsync(s.inst :: LuaSourceContainer, function()
+							return s.text
+						end)
+					end
+					table.insert(roots, root)
 				end)
+				if ok then
+					table.insert(paths, request.trees[i])
+					table.insert(kept, i - 1)
+				else
+					skipped[tostring(i - 1)] = tostring(err)
+				end
 			end
-			local copies = read.trees(request, roots)
+			local only = table.clone(request)
+			only.trees = paths
+			local copies = read.trees(only, roots)
 			folder.Parent = nil
-			return copies
+			return { trees = copies.trees, kept = kept, skipped = skipped }
 		end),
 	}
 	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)
