@@ -11,8 +11,12 @@ pub const RESERVED: [&str; 4] = ["class", "name", "tags", "attributes"];
 const MAX_KEY: usize = 100;
 const CUT_TO: usize = 80;
 
-/// Extensions forge gives its own files; a name ending in one is escaped so it can't clash with them.
-const OWN_SUFFIXES: [&str; 3] = [".luau", ".rbxm", ".toml"];
+/// Endings forge gives its own file names (extensions, and the `.server` / `.client` of script files, decision 0020);
+/// a name ending in one is escaped so it can't clash with them.
+const OWN_SUFFIXES: [&str; 5] = [".luau", ".rbxm", ".toml", ".server", ".client"];
+
+/// The stem of a script folder's own file (`init.luau`); a child can't be called that, in any case.
+const INIT: &str = "init";
 
 const DEVICE_NAMES: [&str; 4] = ["CON", "PRN", "AUX", "NUL"];
 
@@ -49,8 +53,14 @@ pub fn base(name: &str, clashes: &dyn Fn(&str) -> bool) -> String {
         let dot = out.len() - suffix.len();
         out.replace_range(dot..dot + 1, "%2E");
     }
-    // `_` is the stem of a folder's own files (`_.toml`, and the root's `_.luau`), so a child can't be called that.
-    if out == "_" || is_device_name(&out) || RESERVED.contains(&out.as_str()) || clashes(&out) {
+    // `_` and `init` are the stems of a folder's own files (`_.toml`, `_.rbxm`, `init.luau`), so a child can't be
+    // called either.
+    if out == "_"
+        || out.eq_ignore_ascii_case(INIT)
+        || is_device_name(&out)
+        || RESERVED.contains(&out.as_str())
+        || clashes(&out)
+    {
         let first = out.chars().next().unwrap_or('_');
         let rest: String = out.chars().skip(1).collect();
         out = format!(
@@ -186,6 +196,18 @@ mod tests {
         assert_eq!(b(""), "~0");
         assert_eq!(b("tab\there"), "tab%09here");
         assert_eq!(b("ünï"), "ünï");
+    }
+
+    #[test]
+    fn names_that_read_as_script_files_are_escaped() {
+        assert_eq!(b("init"), "%69nit");
+        assert_eq!(b("Init"), "%49nit");
+        assert_eq!(b("INIT"), "%49NIT");
+        assert_eq!(b("Foo.server"), "Foo%2Eserver");
+        assert_eq!(b("Foo.Client"), "Foo%2EClient");
+        assert_eq!(b("init.server"), "init%2Eserver");
+        assert_eq!(b("initial"), "initial");
+        assert_eq!(b("Server"), "Server");
     }
 
     #[test]
