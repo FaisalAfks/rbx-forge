@@ -11,6 +11,8 @@ function sync.handle(request: any): any
 		return read.classes(request.trees)
 	elseif request.action == "read" then
 		return read.trees(request)
+	elseif request.action == "drafts" then
+		return read.drafts(request.trees)
 	end
 	error(`forge's plugin has no sync action {request.action}: run forge plugin install`)
 end

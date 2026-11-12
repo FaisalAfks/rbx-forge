@@ -112,7 +112,8 @@ The sync requests (`forge sync pull`):
 | action | Fields | Reply |
 |---|---|---|
 | `classes` | `trees`: each tree's path from `forge.toml`, a list of names | `classes`: each class under the trees, with every property's `name`, `owner`, `engine` type, `serialized`, `read`, `write` and `deprecated`, from `ReflectionService` |
-| `read` | `trees`, `classes` (from the first reply), `properties` and `methods` (per class, each property's disk type), `models` (classes sent as a model file), `modelTimeoutMs`, `yieldEvery` | `trees`: per tree, `tree` (the instance tree in the JSON form `tools/sync/src/tree.rs` reads) and `ms` (how long Studio took) |
+| `drafts` | `trees` | `drafts`: per tree, the full names of scripts whose `Source` differs from the editor's text (an uncommitted draft) |
+| `read` | `trees`, `classes` (from the first reply), `properties` and `methods` (per class, each property's disk type), `models` (classes sent as a model file), `modelTimeoutMs`, `yieldEvery` | `trees`: per tree, `tree` (the instance tree in the JSON form `tools/sync/src/tree.rs` reads), `ms` (how long Studio took) and `drafts` (as above) |
 
 ### Matching places to repos
 

@@ -71,6 +71,8 @@ enum SyncCommand {
         #[arg(long)]
         force: bool,
     },
+    /// Say whether the game's Studio is linked, and list scripts with an uncommitted draft.
+    Status,
 }
 
 #[derive(Subcommand)]
@@ -110,6 +112,7 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::Sync { command } => match command {
             SyncCommand::Pull { force } => block_on(sync::pull(&settings()?, file, force)),
+            SyncCommand::Status => block_on(sync::status(&settings()?, file)),
         },
         Command::Stop => block_on(stop(&settings()?, file)),
         Command::Status => block_on(status(&settings()?, file)),
