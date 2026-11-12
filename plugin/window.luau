@@ -159,7 +159,8 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 	local link: { state: LinkState, detail: string } = { state = "off", detail = "" }
 	local recent: { string } = {}
 	local pending: { ask: Ask, finish: (string) -> () }? = nil
-	local notices: { [string]: Notice } = {}
+	-- Each tool's notice; a tool with none has no entry.
+	local notices: { [string]: Notice? } = {}
 
 	local render: () -> ()
 
@@ -221,6 +222,9 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 		table.sort(tools)
 		for _, tool in tools do
 			local n = notices[tool]
+			if n == nil then
+				continue
+			end
 			local k = card(body, 3, theme(Enum.StudioStyleGuideColor.ErrorText))
 			text(k, n.title, 1, { bold = true })
 			for i, line in n.lines do
