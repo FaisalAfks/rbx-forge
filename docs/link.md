@@ -84,7 +84,7 @@ is told to reinstall.)
 | `hello` | command | `role = "cli"`, `protocol`, `version`, `repo`: `{ root, place }` of the `forge.toml` it runs under, or null | `welcome` |
 | `welcome` | server | `server = "forge"`, `version`, `protocol` | |
 | `error` | server | `message` | |
-| `status` | command | | `status_report`: `version`, `port`, `studios` (each: `session`, `place`, `game`, `name`, `plugin`, `connected_secs`), `repos` (each: `root`, `place`) |
+| `status` | command | | `status_report`: `version`, `port`, `studios` (each: `session`, `place`, `game`, `name`, `plugin`, `connected_secs`), `repos` (each: `root`, `place`), `refused` (each: `place`, `message`: a plugin turned away, for an old protocol, until one on that place links) |
 | `stop` | command | | `stopping`, then the server closes every connection and exits |
 | `to_studio` | command | `place`, `request` (any JSON, for the plugin) | `from_studio` with `reply`, or `error` |
 | `request` | server | `id`, `request` | `reply` with `id` and `reply`, or `failed` with `id` and `message` |

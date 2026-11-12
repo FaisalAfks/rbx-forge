@@ -52,6 +52,9 @@ not synced, because plugins can't read and write them (they stay as they are in 
 
 Every folder's changes are worked out and checked before any file is written. A pull that stops changes nothing.
 
+Before that, each tree's files are read back: they have to hold every instance Studio sent, and writing what was read
+has to give the same bytes. That's decision 0011's round trip, run on every pull on the real data.
+
 ## What it never touches
 
 - **The place.** Pull only reads from Studio.
@@ -74,7 +77,9 @@ Files git doesn't track yet (an earlier pull nobody committed) don't stop it.
 These also stop it, and aren't forced:
 - no Studio with the place, or more than one;
 - a tree path that names nothing, or names two siblings with the same name;
-- the tree changing in Studio between pull's two requests (run it again).
+- the tree changing in Studio between pull's two requests (run it again);
+- the files not reading back whole (a bug in forge: the error names the tree and the file);
+- git failing for any reason other than not being installed or the folder not being in a repo.
 
 ## How long it takes
 
