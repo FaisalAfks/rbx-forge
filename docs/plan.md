@@ -9,6 +9,7 @@ readable files: code, UI, maps and models, as one nested tree. Why it's built th
 
 ```
 rbx-forge/
+  core/            what every tool uses: the link to Studio, settings, forge.toml, the Tool interface (decision 0019)
   forge/           the CLI: one command, a subcommand per tool (forge sync ..., forge doctor ...)
   mcp/             one MCP server that exposes every tool to agents
   plugin/          one Studio plugin: the Studio side of every tool (export, import, status)
@@ -102,9 +103,10 @@ The probes are answered, so sync is built from decisions 0005 to 0015, in PR-siz
 **Where the code goes:**
 
 ```
-forge/          the `forge` binary: commands, the server, `forge mcp`, `forge plugin install`   (Rust)
-mcp/            the MCP server's tools, used by `forge mcp`                                      (Rust)
-tools/sync/     sync's own code: values, layout, diff, merge (Rust) and studio/ (Luau)
+core/           the link (server, client, protocol), settings, forge.toml, the Tool interface   (Rust)
+forge/          the `forge` binary: forge's own commands, the list of tools, packing the plugin (Rust)
+mcp/            `forge mcp`: every tool's MCP tools                                             (Rust)
+tools/sync/     sync: values, layout, diff, merge, its commands (Rust) and studio/ (Luau)
 plugin/         the plugin's shared parts: the link, the widget, packing every tool's studio/   (Luau)
 ```
 

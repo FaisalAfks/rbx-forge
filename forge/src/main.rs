@@ -1,34 +1,19 @@
-//! The `forge` command: one binary, a subcommand per tool. It reads forge's settings and a game's `forge.toml`, runs
-//! the server that holds the link to Studio, installs forge's plugin, and pulls a game's trees to disk; the rest of
-//! sync's commands join it step by step (docs/plan.md).
+//! The `forge` command: one binary, a subcommand per tool. It runs the server that holds the link to Studio, shows
+//! forge's settings and a game's `forge.toml`, installs forge's plugin and serves the MCP; every other command is a
+//! tool's, from the list in `TOOLS` (decision 0019).
 
-/// Prints a line to standard output. When nothing reads it any more (`forge sync diff | head`), the command ends there
-/// instead of failing, as command-line tools do.
-macro_rules! say {
-    ($($t:tt)*) => {{
-        use std::io::Write as _;
-        if writeln!(std::io::stdout(), $($t)*).is_err() {
-            std::process::exit(0);
-        }
-    }};
-}
-
-mod client;
-mod game;
 mod pack;
-mod protocol;
-mod server;
-mod settings;
-mod sync;
-mod watch;
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
+use forge_core::protocol::{Message, StatusReport};
+use forge_core::settings::Settings;
+use forge_core::{Cx, Tool, block_on, client, game, say, server};
 
-use crate::protocol::{Message, Repo, StatusReport};
-use crate::settings::Settings;
+/// Every tool forge has. A new tool is one more line here, in `plugin/main.luau`, and nothing else.
+static TOOLS: &[&dyn Tool] = &[&forge_sync::SYNC];
 
 #[derive(Parser)]
 #[command(
@@ -63,54 +48,12 @@ enum Command {
     Stop,
     /// Show the server, the Studios connected to it, and the game repo each one belongs to.
     Status,
-    /// Sync a game's trees between Studio and its repo (forge.toml names them).
-    Sync {
-        #[command(subcommand)]
-        command: SyncCommand,
-    },
     /// Serve forge's tools to an MCP client (an agent) over stdio. Each tool runs a forge command in the game's repo.
     Mcp,
     /// forge's Studio plugin.
     Plugin {
         #[command(subcommand)]
         command: PluginCommand,
-    },
-}
-
-#[derive(Subcommand)]
-enum SyncCommand {
-    /// Write each tree in forge.toml from the Studio that has the place open to its folder.
-    Pull {
-        /// Pull into a folder forge didn't make, leave files forge doesn't write, and write over uncommitted changes.
-        #[arg(long)]
-        force: bool,
-    },
-    /// Say whether the game's Studio is linked, and list scripts with an uncommitted draft.
-    Status,
-    /// List what differs between Studio and the files: instances added, removed and moved, changed values, and
-    /// scripts with the lines changed.
-    Diff,
-    /// Build a copy of each tree in Studio from its files, read it back, and compare it with the original value by
-    /// value. The copy is gone afterwards and nothing else changes.
-    Check {
-        /// Only this tree: its Studio path (StarterGui.Hud) or its folder.
-        tree: Option<String>,
-    },
-    /// Keep Studio and the files in step both ways until Ctrl+C. A value both sides changed differently is held as a
-    /// clash until a side is picked.
-    Watch,
-    /// Settle a clash a running watch holds: keep Studio's value or the files'.
-    Pick {
-        /// The clash's number, as `forge sync status` lists them.
-        number: usize,
-        /// studio or disk: the side whose value wins.
-        side: String,
-    },
-    /// Make Studio match the files. The plan shows in Studio, and nothing changes until Apply is clicked there.
-    Push {
-        /// Push the trees from this folder (laid out like the game's, such as a backup) instead of the game's own.
-        #[arg(long)]
-        from: Option<PathBuf>,
     },
 }
 
@@ -127,19 +70,40 @@ enum PluginCommand {
 }
 
 fn main() {
-    if let Err(err) = run(Cli::parse()) {
+    if let Err(err) = run() {
         // `{:#}` prints the whole chain ("forge.toml is wrong: unknown field ..."), which is what tells people the fix.
         eprintln!("error: {err:#}");
         std::process::exit(1);
     }
 }
 
-fn run(cli: Cli) -> Result<()> {
-    let file = cli.settings.or_else(settings::user_file);
-    let file = file.as_deref();
-    let settings = || settings::load(file);
+/// forge's own commands, then each tool's as its own subcommand.
+fn command() -> clap::Command {
+    TOOLS.iter().fold(Cli::command(), |command, tool| {
+        command.subcommand(tool.command())
+    })
+}
+
+fn run() -> Result<()> {
+    let matches = command().get_matches();
+    let file = matches
+        .get_one::<PathBuf>("settings")
+        .cloned()
+        .or_else(forge_core::settings::user_file);
+    let cx = Cx {
+        settings_file: file,
+        tools: TOOLS,
+    };
+    if let Some((name, sub)) = matches.subcommand()
+        && let Some(tool) = TOOLS.iter().find(|t| t.name() == name)
+    {
+        return tool.run(&cx, sub);
+    }
+    let cli = Cli::from_arg_matches(&matches)?;
+    let settings = || cx.settings();
+    let file = cx.settings_file();
     match cli.command {
-        Command::Config { dir } => show_config(file, &dir),
+        Command::Config { dir } => show_config(&cx, &dir),
         Command::Serve { log } => {
             let s = settings()?.server;
             let config = server::Config {
@@ -149,26 +113,16 @@ fn run(cli: Cli) -> Result<()> {
             };
             block_on(server::run(config, log.as_deref()))
         }
-        Command::Sync { command } => match command {
-            SyncCommand::Pull { force } => block_on(sync::pull(&settings()?, file, force)),
-            SyncCommand::Status => block_on(sync::status(&settings()?, file)),
-            SyncCommand::Diff => block_on(sync::diff(&settings()?, file)),
-            SyncCommand::Watch => block_on(watch::watch(&settings()?, file)),
-            SyncCommand::Pick { number, side } => watch::pick(number, &side),
-            SyncCommand::Check { tree } => {
-                block_on(sync::check(&settings()?, file, tree.as_deref()))
-            }
-            SyncCommand::Push { from } => block_on(sync::push(&settings()?, file, from.as_deref())),
-        },
         Command::Stop => block_on(stop(&settings()?, file)),
-        Command::Status => block_on(status(&settings()?, file)),
+        Command::Status => block_on(status(&cx, &settings()?)),
         Command::Mcp => {
             let exe = std::env::current_exe().context("can't find the forge program")?;
+            let tools = TOOLS.iter().flat_map(|t| t.mcp_tools()).collect();
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .context("can't start forge's async runtime")?
-                .block_on(forge_mcp::serve(exe))
+                .block_on(forge_mcp::serve(exe, tools))
         }
         Command::Plugin { command } => match command {
             PluginCommand::Install { out } => install_plugin(&settings()?, out.as_deref()),
@@ -179,28 +133,6 @@ fn run(cli: Cli) -> Result<()> {
             }
         },
     }
-}
-
-/// The link is async; one thread is plenty for a handful of connections.
-fn block_on<F: std::future::Future<Output = Result<()>>>(future: F) -> Result<()> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .context("can't start forge's async runtime")?
-        .block_on(future)
-}
-
-/// The game repo the command runs in, so the server can match its place to a Studio.
-pub(crate) fn this_repo() -> Result<Option<Repo>> {
-    let dir = std::env::current_dir().context("can't read the current folder")?;
-    let Some(path) = game::find(&dir) else {
-        return Ok(None);
-    };
-    let g = game::load(&path)?;
-    Ok(Some(Repo {
-        root: g.root.display().to_string(),
-        place: g.place,
-    }))
 }
 
 async fn stop(settings: &Settings, file: Option<&Path>) -> Result<()> {
@@ -230,8 +162,9 @@ async fn stop(settings: &Settings, file: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-async fn status(settings: &Settings, file: Option<&Path>) -> Result<()> {
-    let mut link = client::connect(settings, file, this_repo()?, true)
+async fn status(cx: &Cx, settings: &Settings) -> Result<()> {
+    let file = cx.settings_file();
+    let mut link = client::connect(settings, file, cx.this_repo()?, true)
         .await?
         .expect("connect starts the server when asked to");
     let mut report = ask_status(&mut link).await?;
@@ -326,33 +259,47 @@ fn install_plugin(settings: &Settings, out: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-fn show_config(file: Option<&Path>, dir: &Path) -> Result<()> {
-    let s = settings::load(file)?;
-    match file {
+fn show_config(cx: &Cx, dir: &Path) -> Result<()> {
+    let s = cx.settings()?;
+    match cx.settings_file() {
         Some(path) if path.is_file() => say!("settings: {}", path.display()),
         Some(path) => say!("settings: defaults ({} doesn't exist)", path.display()),
         None => say!("settings: defaults (this system has no settings folder)"),
     }
-    say!(
-        "{}",
-        toml::to_string(&s)
-            .context("can't show the settings")?
-            .trim_end()
-    );
+    let mut text = s.core_toml()?;
+    for tool in TOOLS {
+        let part = tool.settings_toml(&s)?;
+        if !part.is_empty() {
+            text = format!(
+                "{}
+
+{part}",
+                text.trim_end()
+            );
+        }
+    }
+    say!("{}", text.trim_end());
 
     let dir = std::path::absolute(dir).with_context(|| format!("can't use {}", dir.display()))?;
     match game::find(&dir) {
         None => say!(
-            "\ngame: no {} in {} or above it",
+            "
+game: no {} in {} or above it",
             game::FILE_NAME,
             dir.display()
         ),
         Some(path) => {
-            let g = game::load(&path)?;
-            say!("\ngame: {}", path.display());
+            let g = game::load(&path, TOOLS)?;
+            say!(
+                "
+game: {}",
+                path.display()
+            );
             say!("place = {}", g.place);
-            for t in &g.trees {
-                say!("{} -> {}", t.studio.join("."), t.disk.display());
+            for tool in TOOLS {
+                for line in tool.game_lines(&g)? {
+                    say!("{line}");
+                }
             }
         }
     }

@@ -1,0 +1,19 @@
+# forge sync's settings and their defaults. Any of them can be changed in the settings file that `forge config`
+# names.
+
+[sync]
+# How long the plugin waits for one MeshPart's model file (decision 0011). SerializeInstancesAsync has been seen not to
+# answer at all (decision 0006), so it always has a limit.
+model_timeout_ms = 10000
+# How many instances the plugin reads before it lets Studio run a frame, so a big tree never freezes Studio.
+yield_every = 500
+# How long a push's plan waits in Studio for Apply or Cancel before it's cancelled on its own.
+confirm_timeout_ms = 600000
+
+[watch]
+# How long an instance in Studio must stay unchanged before its changes are sent, so a drag is one change (0013).
+studio_quiet_ms = 250
+# How long the synced folders must stay quiet before changed files are read as one batch (0013).
+disk_quiet_ms = 300
+# How often the plugin checks script text for edits that fire no event (0013).
+script_poll_ms = 1000

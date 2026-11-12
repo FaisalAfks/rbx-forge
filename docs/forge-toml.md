@@ -31,7 +31,8 @@ Rules, checked whenever forge reads the file:
 ## forge's own settings
 
 Settings that belong to the PC, not to a game (the server's port, quiet times, the script poll), have defaults in
-[`forge/defaults.toml`](../forge/defaults.toml), with a comment on each. To change one, put only that setting in the
+[`core/defaults.toml`](../core/defaults.toml) for forge's own and in each tool's `defaults.toml`
+([sync's](../tools/sync/defaults.toml)), with a comment on each. To change one, put only that setting in the
 settings file. On Windows, it's `%APPDATA%\forge\settings.toml`:
 
 ```toml

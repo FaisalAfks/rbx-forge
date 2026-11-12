@@ -1,14 +1,16 @@
-//! A game's `forge.toml`: which place it is, and which parts of the place are synced to which folders. forge itself
-//! never knows about one game; everything game-specific is in this file, in the game's repo.
+//! sync's part of a game's `forge.toml`: the `[[sync]]` trees, each a part of the place and the folder it's synced to.
+//! Core reads the rest of the file (`forge_core::game`).
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
+use forge_core::game::Game as CoreGame;
 use serde::Deserialize;
 
-pub const FILE_NAME: &str = "forge.toml";
+/// The `forge.toml` key sync owns.
+pub const KEY: &str = "sync";
 
-/// A game's settings, read from its `forge.toml`.
+/// A game as sync sees it: its folder, its place and its trees.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Game {
     /// The folder that holds `forge.toml`; every disk path is relative to it.
@@ -28,17 +30,24 @@ pub struct Tree {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct File {
-    place: u64,
-    #[serde(default)]
-    sync: Vec<FileTree>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct FileTree {
     studio: StudioPath,
     disk: String,
+}
+
+/// Reads and checks a game's `[[sync]]` trees.
+pub fn read(game: &CoreGame) -> Result<Game> {
+    let trees = game
+        .get::<Vec<FileTree>>(KEY)?
+        .into_iter()
+        .map(|t| check_tree(t.studio.names(), &t.disk))
+        .collect::<Result<Vec<_>>>()?;
+    check_no_overlap(&trees)?;
+    Ok(Game {
+        root: game.root.clone(),
+        place: game.place,
+        trees,
+    })
 }
 
 /// A Studio path is written `"StarterGui.Hud"`, or as a list of names when a name has a dot in it.
@@ -56,41 +65,6 @@ impl StudioPath {
             StudioPath::Names(names) => names,
         }
     }
-}
-
-/// Finds `forge.toml` in `start` or the nearest folder above it, the way git finds its repo.
-pub fn find(start: &Path) -> Option<PathBuf> {
-    start
-        .ancestors()
-        .map(|dir| dir.join(FILE_NAME))
-        .find(|p| p.is_file())
-}
-
-/// Reads and checks a `forge.toml`.
-pub fn load(path: &Path) -> Result<Game> {
-    let text =
-        std::fs::read_to_string(path).with_context(|| format!("can't read {}", path.display()))?;
-    let root = path.parent().unwrap_or(Path::new(".")).to_path_buf();
-    parse(&text, root).with_context(|| format!("{} is wrong", path.display()))
-}
-
-/// Parses the text of a `forge.toml` whose folder is `root`.
-pub fn parse(text: &str, root: PathBuf) -> Result<Game> {
-    let file: File = toml::from_str(text)?;
-    if file.place == 0 {
-        bail!("`place` must be the place id from Studio (a number above 0)");
-    }
-    let trees = file
-        .sync
-        .into_iter()
-        .map(|t| check_tree(t.studio.names(), &t.disk))
-        .collect::<Result<Vec<_>>>()?;
-    check_no_overlap(&trees)?;
-    Ok(Game {
-        root,
-        place: file.place,
-        trees,
-    })
 }
 
 fn check_tree(studio: Vec<String>, disk: &str) -> Result<Tree> {
@@ -141,7 +115,8 @@ mod tests {
     use super::*;
 
     fn game(text: &str) -> Result<Game> {
-        parse(text, PathBuf::from("repo"))
+        let core = forge_core::game::parse(text, PathBuf::from("repo"), &[&crate::tool::SYNC])?;
+        read(&core)
     }
 
     fn error(text: &str) -> String {
@@ -171,17 +146,6 @@ mod tests {
     #[test]
     fn no_trees_is_allowed() {
         assert!(game("place = 1").unwrap().trees.is_empty());
-    }
-
-    #[test]
-    fn needs_a_place() {
-        assert!(error("").contains("place"));
-        assert!(error("place = 0").contains("place id"));
-    }
-
-    #[test]
-    fn rejects_unknown_keys() {
-        assert!(error("place = 1\nplaec = 2").contains("plaec"));
     }
 
     #[test]
@@ -226,15 +190,5 @@ mod tests {
             disk = "game/ui/arena"
         "#;
         assert!(error(same_disk).contains("overlap"));
-    }
-
-    #[test]
-    fn finds_the_file_in_a_parent_folder() {
-        let root = std::env::temp_dir().join(format!("forge-find-{}", std::process::id()));
-        let deep = root.join("a").join("b");
-        std::fs::create_dir_all(&deep).unwrap();
-        std::fs::write(root.join(FILE_NAME), "place = 1").unwrap();
-        assert_eq!(find(&deep), Some(root.join(FILE_NAME)));
-        std::fs::remove_dir_all(&root).unwrap();
     }
 }

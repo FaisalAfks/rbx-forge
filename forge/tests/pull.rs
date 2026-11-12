@@ -11,7 +11,7 @@ use std::time::Duration;
 use serde_json::{Value as Json, json};
 use tungstenite::Message;
 
-/// The link protocol this forge speaks (forge/src/protocol.rs).
+/// The link protocol this forge speaks (core/src/protocol.rs).
 const PROTOCOL: u32 = 3;
 
 /// A script with CRLF line ends and no last newline: git would change those bytes without the `.gitattributes`.

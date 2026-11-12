@@ -22,6 +22,14 @@ export type Ask = {
 
 export type LinkState = "linked" | "trying" | "off"
 
+-- Something a tool keeps on the home page until it's settled (sync's held clashes): a bold title, one line per item,
+-- and a hint on what to do.
+export type Notice = {
+	title: string,
+	lines: { string },
+	hint: string,
+}
+
 export type Window = {
 	-- The link's state, and a detail line (the server's version, or an error).
 	setLink: (state: string, detail: string) -> (),
@@ -29,8 +37,8 @@ export type Window = {
 	log: (text: string) -> (),
 	-- Shows a push's plan and waits: "apply", "cancel" or "timeout".
 	ask: (ask: Ask) -> string,
-	-- Watch's held clashes, one line each (none hides the card).
-	setClashes: (lines: { string }) -> (),
+	-- A tool's notice on the home page; nil takes it away.
+	setNotice: (tool: string, notice: Notice?) -> (),
 	toggle: () -> (),
 }
 
@@ -151,7 +159,7 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 	local link: { state: LinkState, detail: string } = { state = "off", detail = "" }
 	local recent: { string } = {}
 	local pending: { ask: Ask, finish: (string) -> () }? = nil
-	local clashes: { string } = {}
+	local notices: { [string]: Notice } = {}
 
 	local render: () -> ()
 
@@ -206,13 +214,19 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 			end)
 		end
 
-		if #clashes > 0 then
+		local tools = {}
+		for tool in notices do
+			table.insert(tools, tool)
+		end
+		table.sort(tools)
+		for _, tool in tools do
+			local n = notices[tool]
 			local k = card(body, 3, theme(Enum.StudioStyleGuideColor.ErrorText))
-			text(k, `{#clashes} clashes held: both sides changed these`, 1, { bold = true })
-			for i, line in clashes do
+			text(k, n.title, 1, { bold = true })
+			for i, line in n.lines do
 				text(k, line, 1 + i, { mono = true, size = 14 })
 			end
-			text(k, "Pick a side with forge sync pick <number> studio|disk; until then each side keeps its own.", 99, {
+			text(k, n.hint, 99, {
 				color = theme(Enum.StudioStyleGuideColor.DimmedText),
 				size = 13,
 			})
@@ -418,8 +432,8 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 			render()
 			return result :: string
 		end,
-		setClashes = function(lines)
-			clashes = lines
+		setNotice = function(tool, notice)
+			notices[tool] = notice
 			render()
 		end,
 		toggle = function()

@@ -3,7 +3,7 @@
 //!
 //! The plugin says when a tree in Studio has been quiet after a change; the files are watched here, and a tree whose
 //! folder has been quiet after a change is handled the same way. Either way the tree is reconciled: Studio's copy and
-//! the files are each merged with the state they last agreed on (`forge_sync::merge`). What only one side changed goes
+//! the files are each merged with the state they last agreed on (`crate::merge`). What only one side changed goes
 //! to the other: files are written, and Studio gets a push (which asks for Apply as the plugin's setting says). A value
 //! both changed differently is held as a clash until a side is picked; everything else keeps syncing.
 //!
@@ -14,14 +14,14 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow, bail};
-use forge_sync::merge::{self, Clash, Flat};
-use forge_sync::{diff, disk, layout, push as plan};
+use forge_core::{Cx, client, say};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::client;
+use crate::commands::{Session, print_drafts};
+use crate::merge::{self, Clash, Flat};
 use crate::settings::Settings;
-use crate::sync::{Session, print_drafts};
+use crate::{diff, disk, layout, push as plan};
 
 /// How often the loop looks for trees that have gone quiet.
 const TICK: Duration = Duration::from_millis(50);
@@ -60,8 +60,8 @@ struct Tree {
     clashes: Vec<Clash>,
 }
 
-pub async fn watch(settings: &Settings, settings_file: Option<&Path>) -> Result<()> {
-    let mut session = Session::open(settings, settings_file).await?;
+pub async fn watch(cx: &Cx, settings: &Settings) -> Result<()> {
+    let mut session = Session::open(cx, settings).await?;
     let studio = session.read(settings).await?;
     let schema = studio.selection.schema.clone();
 
@@ -75,7 +75,7 @@ pub async fn watch(settings: &Settings, settings_file: Option<&Path>) -> Result<
                 from.name
             );
         }
-        let changes = crate::sync::changes(&from.node, &folder, &schema)?;
+        let changes = crate::commands::changes(&from.node, &folder, &schema)?;
         if !changes.is_empty() {
             bail!(
                 "{} differs between Studio and its files ({} differences, `forge sync diff` lists them): run \
@@ -103,7 +103,7 @@ pub async fn watch(settings: &Settings, settings_file: Option<&Path>) -> Result<
     start["quietMs"] = json!(settings.watch.studio_quiet_ms);
     start["pollMs"] = json!(settings.watch.script_poll_ms);
     session.ask("watch", start).await?;
-    let mut events = client::connect(settings, settings_file, None, false)
+    let mut events = client::connect(settings, cx.settings_file(), None, false)
         .await?
         .ok_or_else(|| anyhow!("forge serve stopped"))?;
     events.subscribe(session.game.place).await?;
@@ -368,7 +368,8 @@ pub fn pick(number: usize, side: &str) -> Result<()> {
         bail!("pick a side: studio or disk");
     }
     let cwd = std::env::current_dir()?;
-    let path = crate::game::find(&cwd).ok_or_else(|| anyhow!("no forge.toml here or above"))?;
+    let path =
+        forge_core::game::find(&cwd).ok_or_else(|| anyhow!("no forge.toml here or above"))?;
     let root = path.parent().unwrap_or(&cwd).to_path_buf();
     let clashes = read_clashes(&root);
     let Some(h) = number.checked_sub(1).and_then(|n| clashes.get(n)) else {

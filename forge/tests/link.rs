@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use tungstenite::{Message, WebSocket};
 
-/// The link protocol this forge speaks (forge/src/protocol.rs).
+/// The link protocol this forge speaks (core/src/protocol.rs).
 const PROTOCOL: u32 = 3;
 
 /// A server of its own for one test: its own port and settings file, stopped when the test ends, pass or fail.

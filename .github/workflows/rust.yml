@@ -1,11 +1,32 @@
 # Format, lint and tests for the Rust code, on Windows (where forge is used) and Linux. rust-toolchain.toml picks the
-# compiler, so CI and local builds match.
+# compiler, so CI and local builds match. It runs when Rust code, a tool's folder (forge packs each tool's studio/ into
+# its plugin) or the build changes, so a docs-only change doesn't wait on it (decision 0019).
 name: Rust
 
 on:
   pull_request:
+    paths:
+      - "core/**"
+      - "forge/**"
+      - "mcp/**"
+      - "plugin/**"
+      - "tools/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/rust.yml"
   push:
     branches: [main]
+    paths:
+      - "core/**"
+      - "forge/**"
+      - "mcp/**"
+      - "plugin/**"
+      - "tools/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/rust.yml"
 
 permissions:
   contents: read

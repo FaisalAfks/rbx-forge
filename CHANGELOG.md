@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### forge
+
+- forge is now laid out for many tools (decision 0019, `docs/tools.md`). What every tool uses (the link to Studio,
+  settings, a game's `forge.toml`) is in `core/`, and each tool fills in one interface: its command, its settings and
+  `forge.toml` keys, its MCP tools and its Studio side. sync's commands moved into `tools/sync`. Nothing a command does
+  changes; `forge --help` lists tools after forge's own commands (#71)
+- A settings section or `forge.toml` key no tool owns is named as such in the error. Every MCP tool's `repo` argument
+  is described, and the MCP's instructions lost stray spaces
+- CI runs the Rust and Luau checks only when their code changes; the changelog has a section per tool
+
 ## 0.1.1 - 2026-11-12
 
 - `forge sync check` builds each tree's copy on its own: a tree plugins can't create (TextChatService's settings) is

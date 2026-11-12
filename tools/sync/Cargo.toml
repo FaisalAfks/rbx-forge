@@ -1,6 +1,6 @@
 [package]
 name = "forge-sync"
-description = "forge sync's own code: Roblox values, the disk layout, and later diff and merge"
+description = "forge sync: a game's trees between Studio and its repo, as readable files"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
@@ -8,9 +8,13 @@ repository.workspace = true
 [dependencies]
 anyhow = "1.0.104"
 base64 = "0.23.1"
+clap = { version = "4.6.7", features = ["derive"] }
+forge-core = { path = "../../core" }
+notify = "8.2.2"
 serde = { version = "1.0.229", features = ["derive"] }
 similar = "3.2.1"
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }  # exact float parsing (decision 0014)
+tokio = { version = "1.54.1", features = ["macros", "rt", "signal", "sync", "time"] }
 toml = "1.2.1"
 
 [lints]
