@@ -68,6 +68,8 @@ enum Command {
         #[command(subcommand)]
         command: SyncCommand,
     },
+    /// Serve forge's tools to an MCP client (an agent) over stdio. Each tool runs a forge command in the game's repo.
+    Mcp,
     /// forge's Studio plugin.
     Plugin {
         #[command(subcommand)]
@@ -160,6 +162,14 @@ fn run(cli: Cli) -> Result<()> {
         },
         Command::Stop => block_on(stop(&settings()?, file)),
         Command::Status => block_on(status(&settings()?, file)),
+        Command::Mcp => {
+            let exe = std::env::current_exe().context("can't find the forge program")?;
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .context("can't start forge's async runtime")?
+                .block_on(forge_mcp::serve(exe))
+        }
         Command::Plugin { command } => match command {
             PluginCommand::Install { out } => install_plugin(&settings()?, out.as_deref()),
             PluginCommand::Sourcemap => {
