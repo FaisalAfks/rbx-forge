@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.1.1 - 2026-11-12
+
+- `forge sync check` builds each tree's copy on its own: a tree plugins can't create (TextChatService's settings) is
+  named and skipped, and the rest are checked, where it used to stop the whole check (#68). Check and push also keep
+  new instances per tree, so a reference in one tree can't land on an instance another tree adds with the same id
+
 ## 0.1.0 - 2026-11-12
 
 - The guide (`docs/sync/README.md`) takes a game from nothing to synced: install forge from the release, install the

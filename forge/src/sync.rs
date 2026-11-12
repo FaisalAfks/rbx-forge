@@ -305,12 +305,37 @@ pub async fn check(
     let reply = session.ask("check", request).await?;
     let back = reply["trees"]
         .as_array()
-        .filter(|a| a.len() == originals.len())
-        .ok_or_else(|| anyhow!("the plugin didn't send one copy per tree"))?;
+        .ok_or_else(|| anyhow!("the plugin sent no copies"))?;
+    // Which trees were copied, by index; a tree the plugin couldn't copy is named with why.
+    let kept: Vec<usize> = reply["kept"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|i| i.as_u64().map(|i| i as usize))
+                .collect()
+        })
+        .unwrap_or_else(|| (0..back.len()).collect());
+    if kept.len() != back.len() {
+        bail!(
+            "the plugin sent {} copies for {} trees",
+            back.len(),
+            kept.len()
+        );
+    }
     let mut total = 0;
-    for ((from, original), copy) in studio.trees.iter().zip(&originals).zip(back) {
+    for (i, (from, original)) in studio.trees.iter().zip(&originals).enumerate() {
+        let Some(at) = kept.iter().position(|k| *k == i) else {
+            let why = reply["skipped"][i.to_string()]
+                .as_str()
+                .unwrap_or("no reason given");
+            say!(
+                "{}: not checked, the plugin can't build a copy of it ({why}); pull and push still sync its values",
+                from.name
+            );
+            continue;
+        };
         let copy =
-            Node::from_json(&copy["tree"]).with_context(|| format!("{}'s copy", from.name))?;
+            Node::from_json(&back[at]["tree"]).with_context(|| format!("{}'s copy", from.name))?;
         let copy = layout::read(&layout::write(&copy, schema)?, schema)?;
         let changes = diff::diff(original, &copy)?;
         total += changes.len();
