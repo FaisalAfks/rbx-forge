@@ -16,6 +16,8 @@ export type Settings = {
 
 export type Connection = {
 	stop: () -> (),
+	-- Sends an event to forge serve, if the link is up (it's dropped otherwise: nobody would hear it).
+	notify: (event: any) -> (),
 }
 
 -- Answers one request the server passes on from a forge command, or errors with why it can't.
@@ -146,6 +148,12 @@ function link.start(settings: Settings, handler: Handler, onStatus: OnStatus): C
 	end)
 
 	return {
+		notify = function(event)
+			local client = current
+			if client then
+				pcall(client.Send, client, HttpService:JSONEncode({ op = "notify", event = event }))
+			end
+		end,
 		stop = function()
 			running = false
 			status("off", "")

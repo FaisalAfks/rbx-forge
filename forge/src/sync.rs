@@ -100,6 +100,30 @@ impl Session {
             .await
     }
 
+    /// Reads only tree `i` from Studio (watch reconciles one tree at a time).
+    pub async fn read_only(&mut self, settings: &Settings, i: usize) -> Result<StudioTrees> {
+        let one = vec![self.game.trees[i].clone()];
+        let all = std::mem::replace(&mut self.game.trees, one);
+        let read = self.read(settings).await;
+        self.game.trees = all;
+        read
+    }
+
+    /// Asks the plugin's sync side something about tree `i` only.
+    pub async fn ask_only_for(
+        &mut self,
+        i: usize,
+        action: &str,
+        request: Json,
+        timeout_ms: Option<u64>,
+    ) -> Result<Json> {
+        let one = vec![self.game.trees[i].clone()];
+        let all = std::mem::replace(&mut self.game.trees, one);
+        let reply = self.ask_for(action, request, timeout_ms).await;
+        self.game.trees = all;
+        reply
+    }
+
     /// Reads every tree from Studio.
     pub async fn read(&mut self, settings: &Settings) -> Result<StudioTrees> {
         let reply = self.ask("classes", json!({})).await?;
@@ -506,6 +530,16 @@ pub async fn status(settings: &Settings, settings_file: Option<&Path>) -> Result
         .map(|t| t.studio.join("."))
         .collect();
     print_drafts(names.iter().map(String::as_str).zip(&lists));
+    let clashes = crate::watch::status_lines(&session.game.root);
+    if !clashes.is_empty() {
+        say!(
+            "{} clashes held by forge sync watch (forge sync pick <number> studio|disk):",
+            clashes.len()
+        );
+        for c in clashes {
+            say!("  {c}");
+        }
+    }
     Ok(())
 }
 

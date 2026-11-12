@@ -45,6 +45,15 @@ local context = {
 		end
 		return ui.ask(ask)
 	end,
+	notify = function(event: any)
+		local c = connection
+		if c then
+			c.notify(event)
+		end
+	end,
+	showClashes = function(lines: { string })
+		ui.setClashes(lines)
+	end,
 }
 
 -- A line in the window's Recent list for each request a command sends.
@@ -55,6 +64,10 @@ local function note(request: any, result: any)
 		ui.log("Listed scripts with drafts")
 	elseif request.action == "check" then
 		ui.log(`Round-trip check of {#request.trees} trees`)
+	elseif request.action == "watch" then
+		ui.log(`Watching {#request.trees} trees`)
+	elseif request.action == "unwatch" then
+		ui.log("Stopped watching")
 	elseif request.action == "push" then
 		local outcome = if type(result) == "table" then result.result else "?"
 		ui.log(`Push {outcome}: {request.summary}`)

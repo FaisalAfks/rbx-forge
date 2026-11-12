@@ -29,6 +29,8 @@ export type Window = {
 	log: (text: string) -> (),
 	-- Shows a push's plan and waits: "apply", "cancel" or "timeout".
 	ask: (ask: Ask) -> string,
+	-- Watch's held clashes, one line each (none hides the card).
+	setClashes: (lines: { string }) -> (),
 	toggle: () -> (),
 }
 
@@ -149,6 +151,7 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 	local link: { state: LinkState, detail: string } = { state = "off", detail = "" }
 	local recent: { string } = {}
 	local pending: { ask: Ask, finish: (string) -> () }? = nil
+	local clashes: { string } = {}
 
 	local render: () -> ()
 
@@ -203,7 +206,19 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 			end)
 		end
 
-		local r = stack(body, 3, 4)
+		if #clashes > 0 then
+			local k = card(body, 3, theme(Enum.StudioStyleGuideColor.ErrorText))
+			text(k, `{#clashes} clashes held: both sides changed these`, 1, { bold = true })
+			for i, line in clashes do
+				text(k, line, 1 + i, { mono = true, size = 14 })
+			end
+			text(k, "Pick a side with forge sync pick <number> studio|disk; until then each side keeps its own.", 99, {
+				color = theme(Enum.StudioStyleGuideColor.DimmedText),
+				size = 13,
+			})
+		end
+
+		local r = stack(body, 4, 4)
 		text(r, "Recent", 1, { color = theme(Enum.StudioStyleGuideColor.DimmedText), size = 13 })
 		if #recent == 0 then
 			text(r, "Nothing yet", 2, { color = theme(Enum.StudioStyleGuideColor.DimmedText) })
@@ -402,6 +417,10 @@ function window.new(plugin: Plugin, actions: { connect: () -> (), disconnect: ()
 			end
 			render()
 			return result :: string
+		end,
+		setClashes = function(lines)
+			clashes = lines
+			render()
 		end,
 		toggle = function()
 			widget.Enabled = not widget.Enabled
