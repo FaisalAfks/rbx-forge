@@ -19,9 +19,9 @@ What's built next and why is in [docs/plan.md](../docs/plan.md); why things are 
 | `mcp/` | `forge mcp`: sync's commands as MCP tools for agents (Rust) |
 | `plugin/` | forge's Studio plugin (Luau): the link to `forge serve`; each tool's Studio side is in `tools/<name>/studio/` |
 | `tools/sync/` | sync's own code (Rust): values, schema, the instance tree, layout C on disk, which properties to read (`properties.toml`); and `studio/`, its side in the plugin (Luau) |
-| `docs/` | the plan, decisions, `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/format.md` (the disk format), `sync/pull.md`, `sync/diff.md`, `sync/push.md`, `sync/check.md`, `sync/watch.md`, `mcp.md`, and later a guide per tool |
+| `docs/` | the plan, decisions, `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/README.md` (the guide), `sync/format.md` (the disk format), `sync/pull.md`, `sync/diff.md`, `sync/push.md`, `sync/check.md`, `sync/watch.md`, `mcp.md`, and later a guide per tool |
 | `scripts/` | dev helpers (`setup-dev.ps1`) |
-| `.agents/` | this file and `skills/`: step-by-step how-tos (new task, probe, review, release) |
+| `.agents/` | this file and `skills/`: step-by-step how-tos (new task, probe, review, release, working with sync) |
 
 
 ## Commands

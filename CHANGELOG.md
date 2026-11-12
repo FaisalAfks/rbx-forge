@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-11-12
+
+- The guide (`docs/sync/README.md`) takes a game from nothing to synced: install forge from the release, install the
+  plugin, write `forge.toml`, pull, then work day to day, and what forge never touches. An agent skill
+  (`.agents/skills/sync`) says when and how agents use it. Releases build `forge.exe` for Windows and attach it; the
+  plugin is inside it (#41). Example ids in the docs and tests are made up
+
 - `forge mcp`, an MCP server over stdio for agents (#40, `docs/mcp.md`), built on the Rust MCP SDK (`rmcp`). Its tools
   are status, pull, diff, push, check, clashes and pick; each runs the same forge command in the game's repo and
   returns what it printed. A push from it applies only after Apply in Studio, unless the person in Studio set forge
