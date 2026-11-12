@@ -55,7 +55,11 @@ function link.start(settings: Settings, handler: Handler): Connection
 				else { op = "failed", id = message.id, message = tostring(result) }
 			local encoded, text = pcall(HttpService.JSONEncode, HttpService, reply)
 			if not encoded then
-				text = HttpService:JSONEncode({ op = "failed", id = message.id, message = `can't send the answer: {text}` })
+				text = HttpService:JSONEncode({
+					op = "failed",
+					id = message.id,
+					message = `can't send the answer: {text}`,
+				})
 			end
 			pcall(client.Send, client, text)
 		end)

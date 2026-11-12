@@ -27,7 +27,9 @@ local function resolve(path: { string }): Instance
 		for _, child in node:GetChildren() do
 			if child.Name == path[i] then
 				if found then
-					error(`two children of {node:GetFullName()} are named {path[i]}: rename one so forge.toml names one`)
+					error(
+						`two children of {node:GetFullName()} are named {path[i]}: rename one so forge.toml names one`
+					)
 				end
 				found = child
 			end
@@ -221,10 +223,12 @@ end
 -- A model file of `inst` alone, without its children, as base64 (decision 0011). SerializeInstancesAsync has been
 -- seen never to answer, so it has a time limit.
 local function model(inst: Instance, timeoutSeconds: number): string
-	local copy = inst:Clone()
-	if copy == nil then
+	-- Clone gives nil for an instance that can't be copied, which its type doesn't say.
+	local cloned = inst:Clone() :: Instance?
+	if cloned == nil then
 		error(`{inst:GetFullName()} can't be copied for its model file`)
 	end
+	local copy: Instance = cloned
 	copy:ClearAllChildren()
 	local result: { any }? = nil
 	task.spawn(function()
@@ -235,7 +239,9 @@ local function model(inst: Instance, timeoutSeconds: number): string
 		task.wait()
 	end
 	if result == nil then
-		error(`{inst:GetFullName()}: its model file didn't come back within {timeoutSeconds * 1000} ms (sync.model_timeout_ms)`)
+		error(
+			`{inst:GetFullName()}: its model file didn't come back within {timeoutSeconds * 1000} ms (sync.model_timeout_ms)`
+		)
 	end
 	copy:Destroy()
 	local done = result :: { any }
@@ -289,11 +295,14 @@ function read.trees(request: ReadRequest): Json
 		for _, inst in list do
 			local class = inst.ClassName
 			if not known[class] then
-				error(`{inst:GetFullName()} is a {class}, which wasn't there a moment ago: the tree changed during pull, run it again`)
+				error(
+					`{inst:GetFullName()} is a {class}, which wasn't there a moment ago: the tree changed during pull, run it again`
+				)
 			end
 			local where = inst:GetFullName()
 			local properties = {}
-			for name, ty in request.properties[class] or {} do
+			local toRead: { [string]: string } = request.properties[class] or {}
+			for name, ty in toRead do
 				if inst:IsPropertyModified(name) then
 					local ok, value = pcall(function()
 						return (inst :: any)[name]
@@ -303,7 +312,8 @@ function read.trees(request: ReadRequest): Json
 					end
 				end
 			end
-			for name, ty in request.methods[class] or {} do
+			local byMethod: { [string]: string } = request.methods[class] or {}
+			for name, ty in byMethod do
 				local method = METHODS[`{class}.{name}`]
 				if method == nil then
 					error(`forge's plugin has no reader for {class}.{name}: run forge plugin install`)
