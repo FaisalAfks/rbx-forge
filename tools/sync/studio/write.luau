@@ -293,6 +293,49 @@ local function run(trees: { { ops: { Json } } })
 	end
 end
 
+-- Builds a copy of each tree from the files (as `add` builds), in a scratch folder in ServerStorage, reads the copies
+-- with the same request as a read, and takes everything away again: the copies are made inside a recording that's
+-- cancelled, so the place and its undo history are as they were (decision 0011's round trip, as forge's own check).
+function write.check(request: any): Json
+	local recording = ChangeHistoryService:TryBeginRecording("forge sync check")
+	if recording == nil then
+		error("Studio is in the middle of another change (or a playtest): try again")
+	end
+	local result = {
+		pcall(function()
+			local folder = Instance.new("Folder")
+			folder.Name = "forge check (removed when the check ends)"
+			local built: Built = {}
+			local later: { () -> () } = {}
+			local sources: { Source } = {}
+			local roots = {}
+			for _, tree in request.copies do
+				table.insert(roots, build(tree, built, later, sources))
+			end
+			for _, f in later do
+				f()
+			end
+			for _, root in roots do
+				root.Parent = folder
+			end
+			folder.Parent = game:GetService("ServerStorage")
+			for _, s in sources do
+				ScriptEditorService:UpdateSourceAsync(s.inst :: LuaSourceContainer, function()
+					return s.text
+				end)
+			end
+			local copies = read.trees(request, roots)
+			folder.Parent = nil
+			return copies
+		end),
+	}
+	ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)
+	if not result[1] then
+		error(`the check couldn't build its copy: {result[2]}`)
+	end
+	return result[2]
+end
+
 -- Applies a push as one undo step. Returns nothing; errors say why, with Studio put back as it was.
 function write.apply(trees: { { ops: { Json } } })
 	local recording = ChangeHistoryService:TryBeginRecording("forge sync push")

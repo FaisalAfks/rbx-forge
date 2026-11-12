@@ -44,6 +44,8 @@ function sync.handle(request: any, context: Context): any
 		return read.drafts(request.trees)
 	elseif request.action == "push" then
 		return push(request, context)
+	elseif request.action == "check" then
+		return write.check(request)
 	end
 	error(`forge's plugin has no sync action {request.action}: run forge plugin install`)
 end

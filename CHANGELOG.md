@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `forge sync check [tree]` builds a copy of each tree in Studio from its files, reads the copy and compares it with
+  the original value by value, then takes the copy away inside a cancelled undo recording (#37,
+  `docs/sync/check.md`). Each difference is one line, and any difference fails the command
+
 - `forge sync push` makes Studio match the files, after Apply is clicked in forge's window in Studio (#36,
   `docs/sync/push.md`). forge plans it in Rust: instances added, removed and moved, values set or reset, attributes,
   tags, script text and model files. The plugin shows the plan and applies it as one undo step, cancelled whole if

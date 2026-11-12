@@ -145,6 +145,22 @@ pub fn plan(studio: &Node, studio_paths: HashMap<u32, String>, disk: &Node) -> R
     Ok(plan)
 }
 
+/// A tree from the files in the form the plugin builds from, with every reference inside it pointing at the copy
+/// being built: what the round-trip check sends.
+pub fn tree_json(disk: &Node) -> Result<Json> {
+    let d = Index::new(disk);
+    let empty = Node::default();
+    let s = Index::with_paths(&empty, HashMap::new());
+    let gone = BTreeSet::new();
+    let targets = Targets {
+        s: &s,
+        d: &d,
+        gone: &gone,
+        moves: &[],
+    };
+    targets.tree(disk)
+}
+
 /// Properties, attributes and tags that differ, as operations on Studio's instance `a`.
 fn values(t: &Targets, a: &Node, b: &Node, ops: &mut Vec<Json>) -> Result<()> {
     for name in a
