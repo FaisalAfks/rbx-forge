@@ -20,7 +20,9 @@ local DEFAULTS: Values = {
 	connectAutomatically = true,
 }
 
-local KEY = "forge.settings"
+-- Studio stores a "." in a key as "_" and then doesn't find the key with the dot, so the key has none. The settings
+-- file is shared by every local plugin, hence the prefix.
+local KEY = "forge_settings"
 
 -- The stored settings, with a default for any that's missing or unreadable.
 function settings.load(plugin: Plugin): Values
