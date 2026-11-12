@@ -315,7 +315,9 @@ local METHODS: { [string]: { get: (Instance) -> any, default: any } } = {
 	},
 }
 
-function read.trees(request: ReadRequest): Json
+-- Reads each tree in `request.trees`, or, given `roots`, those instances instead (one per tree: the round-trip
+-- check reads its copies this way).
+function read.trees(request: ReadRequest, roots: { Instance }?): Json
 	local known = {}
 	for _, class in request.classes do
 		known[class] = true
@@ -328,9 +330,9 @@ function read.trees(request: ReadRequest): Json
 	local sinceYield = 0
 	local out = {}
 	lastRead = {}
-	for _, path in request.trees do
+	for i, path in request.trees do
 		local started = os.clock()
-		local list = saved(resolve(path))
+		local list = saved(if roots then roots[i] else resolve(path))
 		local ids: { [Instance]: number } = {}
 		for _, inst in list do
 			nextId += 1

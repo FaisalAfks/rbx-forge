@@ -18,7 +18,7 @@ What's built next and why is in [docs/plan.md](../docs/plan.md); why things are 
 | `forge/` | the `forge` binary (Rust): commands, settings (`defaults.toml`), a game's `forge.toml`, `forge serve` and packing the plugin |
 | `plugin/` | forge's Studio plugin (Luau): the link to `forge serve`; each tool's Studio side is in `tools/<name>/studio/` |
 | `tools/sync/` | sync's own code (Rust): values, schema, the instance tree, layout C on disk, which properties to read (`properties.toml`); and `studio/`, its side in the plugin (Luau) |
-| `docs/` | the plan, decisions, `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/format.md` (the disk format), `sync/pull.md`, `sync/diff.md`, `sync/push.md`, and later a guide per tool |
+| `docs/` | the plan, decisions, `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/format.md` (the disk format), `sync/pull.md`, `sync/diff.md`, `sync/push.md`, `sync/check.md`, and later a guide per tool |
 | `scripts/` | dev helpers (`setup-dev.ps1`) |
 | `.agents/` | this file and `skills/`: step-by-step how-tos (new task, probe, review, release) |
 
@@ -39,6 +39,7 @@ cargo run -- sync pull                   # in a game repo: write its trees from 
 cargo run -- sync status                 # in a game repo: is its Studio linked, which scripts have drafts
 cargo run -- sync diff                   # in a game repo: what differs between Studio and its files
 cargo run -- sync push                   # in a game repo: make Studio match the files, after Apply in Studio
+cargo run -- sync check                  # in a game repo: round-trip each tree through a scratch copy in Studio
 rokit install                            # the Luau tools (rokit.toml); then, as CI does:
 stylua --check plugin tools && selene plugin tools
 ```

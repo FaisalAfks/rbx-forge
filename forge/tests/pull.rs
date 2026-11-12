@@ -108,6 +108,13 @@ impl Server {
                 let reply = match request["action"].as_str() {
                     Some("classes") => classes(),
                     Some("drafts") => json!({ "drafts": [["StarterGui.Hud.Main"]] }),
+                    // The copy differs in one value, so the check has something to report.
+                    Some("check") => {
+                        let mut copy = tree();
+                        copy["trees"][0]["tree"]["properties"]["Size"]["value"] =
+                            json!([0, 341, 0, 66]);
+                        copy
+                    }
                     _ => tree(),
                 };
                 let answer = json!({ "op": "reply", "id": message["id"], "reply": reply });
@@ -317,4 +324,29 @@ fn diff_shows_what_changed_on_disk() {
         "{out}"
     );
     assert!(out.contains("  ~ Main script: +2 -1 lines"), "{out}");
+}
+
+#[test]
+fn check_reports_each_value_the_copy_lost() {
+    let server = Server::new("check");
+    let repo = game_repo(&server);
+    assert!(server.forge(&["status"], &repo).0);
+    let requests = server.studio(42);
+    let (ok, out) = server.forge(&["sync", "check", "StarterGui.Hud"], &repo);
+    assert!(!ok, "a difference fails the check: {out}");
+    assert!(
+        out.contains("StarterGui.Hud: 2 instances, 1 differences"),
+        "{out}"
+    );
+    assert!(
+        out.contains("  ~ (top) Size: [0, 340, 0, 66] -> [0, 341, 0, 66]"),
+        "{out}"
+    );
+    let check = requests.iter().find(|r| r["action"] == "check").unwrap();
+    assert_eq!(check["copies"][0]["class"], "Frame");
+    assert_eq!(check["copies"][0]["children"][0]["source"], SCRIPT);
+
+    let (ok, out) = server.forge(&["sync", "check", "Nope"], &repo);
+    assert!(!ok);
+    assert!(out.contains("forge.toml has no tree Nope"), "{out}");
 }

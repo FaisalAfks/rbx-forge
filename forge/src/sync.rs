@@ -11,6 +11,8 @@
 //! - `diff` lists what differs between Studio and disk, both read as layout C has them.
 //! - `push` works out what makes Studio match the files, keeps a backup of what it replaces, and sends the plan to
 //!   the plugin, which applies it only when Apply is clicked in Studio (decision 0015).
+//! - `check` builds a copy of each tree in Studio from its files, reads the copy, and compares it with the original
+//!   value by value (decision 0011); the copy is gone afterwards.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -47,6 +49,8 @@ pub struct StudioTree {
 pub struct StudioTrees {
     pub selection: select::Selection,
     pub trees: Vec<StudioTree>,
+    /// The read request's fields, for reading the same way again (the check's copies).
+    pub request: Json,
 }
 
 impl Session {
@@ -111,7 +115,7 @@ impl Session {
             "modelTimeoutMs": settings.sync.model_timeout_ms,
             "yieldEvery": settings.sync.yield_every,
         });
-        let reply = self.ask("read", request).await?;
+        let reply = self.ask("read", request.clone()).await?;
         let sent = reply["trees"]
             .as_array()
             .filter(|a| a.len() == self.game.trees.len())
@@ -128,7 +132,11 @@ impl Session {
                 drafts: strings(&sent["drafts"]),
             });
         }
-        Ok(StudioTrees { selection, trees })
+        Ok(StudioTrees {
+            selection,
+            trees,
+            request,
+        })
     }
 }
 
@@ -237,6 +245,74 @@ pub fn changes(studio: &Node, folder: &Path, schema: &Schema) -> Result<Vec<diff
         layout::read(&layout::read_dir(folder)?, schema).context("reading the files on disk")?;
     let in_studio = layout::read(&layout::write(studio, schema)?, schema)?;
     diff::diff(&on_disk, &in_studio)
+}
+
+/// Builds a copy of each tree (or only `only`, by Studio path or folder) from its files, reads the copy and compares
+/// it with the original, value by value. Prints each difference; the copies are gone afterwards.
+pub async fn check(
+    settings: &Settings,
+    settings_file: Option<&Path>,
+    only: Option<&str>,
+) -> Result<()> {
+    let mut session = Session::open(settings, settings_file).await?;
+    if let Some(only) = only {
+        session
+            .game
+            .trees
+            .retain(|t| t.studio.join(".") == only || t.disk == Path::new(only));
+        if session.game.trees.is_empty() {
+            bail!(
+                "forge.toml has no tree {only} (give its Studio path, like StarterGui.Hud, or its folder)"
+            );
+        }
+    }
+    let studio = session.read(settings).await?;
+    let schema = &studio.selection.schema;
+    let mut copies = Vec::new();
+    let mut originals = Vec::new();
+    for from in &studio.trees {
+        let files = layout::write(&from.node, schema)?;
+        let on_disk = layout::read(&files, schema)?;
+        copies.push(plan::tree_json(&on_disk)?);
+        originals.push(on_disk);
+    }
+    let mut request = studio.request.clone();
+    request["copies"] = json!(copies);
+    let reply = session.ask("check", request).await?;
+    let back = reply["trees"]
+        .as_array()
+        .filter(|a| a.len() == originals.len())
+        .ok_or_else(|| anyhow!("the plugin didn't send one copy per tree"))?;
+    let mut total = 0;
+    for ((from, original), copy) in studio.trees.iter().zip(&originals).zip(back) {
+        let copy =
+            Node::from_json(&copy["tree"]).with_context(|| format!("{}'s copy", from.name))?;
+        let copy = layout::read(&layout::write(&copy, schema)?, schema)?;
+        let changes = diff::diff(original, &copy)?;
+        total += changes.len();
+        if changes.is_empty() {
+            say!(
+                "{}: {} instances, the copy matches value for value",
+                from.name,
+                original.walk().len()
+            );
+        } else {
+            say!(
+                "{}: {} instances, {} differences between the original and its copy (original -> copy):",
+                from.name,
+                original.walk().len(),
+                changes.len()
+            );
+            for c in &changes {
+                say!("  {c}");
+            }
+        }
+    }
+    print_unsynced(&studio.selection);
+    if total > 0 {
+        bail!("the round trip lost or changed {total} values");
+    }
+    Ok(())
 }
 
 /// Makes Studio match the files, once Apply is clicked in Studio. `from` reads the trees from another folder laid out
