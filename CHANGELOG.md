@@ -24,6 +24,9 @@
   files, `.lua` and `.luau`) and puts the same instances in Studio. Disk owns it: pull leaves it alone, push, diff and
   check work on it, and watch pushes it one way. Its script text is committed, not left as drafts, so `require` works
   at once. Files Rojo would make other instances from are refused by name (#66)
+- A plain Folder needs no `_.toml` (decision 0022): a folder with no `_.toml` and no init file reads as a Folder, and
+  pull writes one only when there's more to say. Trees pulled before read the same; the next pull drops the files
+  that said only `class = "Folder"` (#77)
 
 ## 0.1.1 - 2026-11-12
 

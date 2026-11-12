@@ -675,8 +675,8 @@ fn bad_files_give_errors_that_name_the_file() {
     assert!(err(&f).contains("Bar/Stray.rbxm"));
 
     let mut f = good.clone();
-    f.remove("World/_.toml");
-    assert!(err(&f).contains("World/_.toml is missing"));
+    f.remove("_.toml");
+    assert!(err(&f).contains("_.toml is missing: the tree's top needs one"));
 
     let mut f = good.clone();
     let root = text(&f, "_.toml").replace("Value = \"@\"", "Value = \"@Nowhere\"");
@@ -733,6 +733,79 @@ fn the_plugin_json_goes_to_the_same_files() {
 
 fn file(files: &mut Files, path: &str, text: &str) {
     files.insert(path.into(), text.as_bytes().to_vec());
+}
+
+#[test]
+fn a_plain_folder_has_no_toml() {
+    let s = schema();
+    let mut files = Files::new();
+    file(
+        &mut files,
+        "_.toml",
+        "class = \"Folder\"
+name = \"Code\"
+
+[Empty]
+class = \"Folder\"
+",
+    );
+    file(&mut files, "Util/Signal.luau", "return 1");
+    file(&mut files, "Util/Deep/Spring.luau", "return 2");
+    let tree = layout::read(&files, &s).unwrap();
+    let util = tree.children.iter().find(|c| c.name == "Util").unwrap();
+    assert_eq!(util.class, "Folder");
+    assert_eq!(util.children[0].class, "Folder");
+    assert_eq!(util.children[0].name, "Deep");
+    // Written back, the Folders still have no `_.toml` (decision 0022).
+    assert_eq!(layout::write(&tree, &s).unwrap(), files);
+
+    // A tree pulled before 0022 reads the same, and a pull drops the files that only said `class = "Folder"`.
+    let mut old = files.clone();
+    file(
+        &mut old,
+        "Util/_.toml",
+        "class = \"Folder\"
+",
+    );
+    file(
+        &mut old,
+        "Util/Deep/_.toml",
+        "class = \"Folder\"
+",
+    );
+    let from_old = layout::read(&old, &s).unwrap();
+    assert_eq!(layout::write(&from_old, &s).unwrap(), files);
+
+    // A Folder with more to say keeps its `_.toml`.
+    let mut tagged = files.clone();
+    file(
+        &mut tagged,
+        "Util/_.toml",
+        "class = \"Folder\"
+tags = [\"x\"]
+",
+    );
+    let t = layout::read(&tagged, &s).unwrap();
+    assert_eq!(layout::write(&t, &s).unwrap(), tagged);
+    // So does a Folder whose disk name isn't its real name.
+    let mut named = Files::new();
+    file(
+        &mut named,
+        "_.toml",
+        "class = \"Folder\"
+name = \"Code\"
+",
+    );
+    file(
+        &mut named,
+        "%43ON/_.toml",
+        "class = \"Folder\"
+name = \"CON\"
+",
+    );
+    file(&mut named, "%43ON/Signal.luau", "return 1");
+    let n = layout::read(&named, &s).unwrap();
+    assert_eq!(layout::write(&n, &s).unwrap(), named);
 }
 
 #[test]

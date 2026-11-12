@@ -50,7 +50,7 @@ The comparison was shown as a rendered page, and C was chosen.
 
 **Layout C.**
 - **Folders:** an instance with children is a folder, which matches what's expanded in the Explorer.
-- **The folder's `_.toml`:** the instance's class, its properties, attributes and tags, and one section per child that
+- **The folder's `_.toml`** (a plain Folder needs none since decision 0022): the instance's class, its properties, attributes and tags, and one section per child that
   has no children of its own.
 - **Scripts:**
   - a script's text is always `<name>.luau` in its parent's folder;

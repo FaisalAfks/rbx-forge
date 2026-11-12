@@ -1,5 +1,6 @@
 //! Layout C (decisions 0008 and 0020): a tree as files and back. An instance with children is a folder with a
-//! `_.toml` (its own class, properties, attributes and tags, plus one section per child without children).
+//! `_.toml` (its own class, properties, attributes and tags, plus one section per child without children). A plain
+//! Folder needs no `_.toml` (decision 0022).
 //!
 //! Scripts are named the way Luau tools read them: `Name.luau` is a ModuleScript, `Name.server.luau` a Script and
 //! `Name.client.luau` a LocalScript, in the parent's folder; a script with children keeps its text in its own folder
@@ -172,9 +173,9 @@ fn write_folder(
     if key.is_none() {
         add_model(node, dir, "_", files);
     }
-    // A script's folder needs a `_.toml` only when its file name doesn't say everything; the root always has one, with
-    // its name, and it marks the folder as forge's.
-    let mut needed = key.is_none() || !plain_script(node, key);
+    // A folder needs a `_.toml` only when its name and files don't say everything (a plain Folder, or a script whose
+    // file name gives its class). The root always has one, with its name, and it marks the folder as forge's.
+    let mut needed = key.is_none() || !(plain_script(node, key) || plain_folder(node, key));
     let mut toml = body(node, key, keys)?;
     if !node.attributes.is_empty() {
         toml.push_str("\n[attributes]\n");
@@ -216,6 +217,17 @@ fn write_folder(
 fn plain_script(node: &Node, key: Option<&str>) -> bool {
     node.source.is_some()
         && script_suffix(&node.class).is_some()
+        && key == Some(node.name.as_str())
+        && node.properties.is_empty()
+        && node.attributes.is_empty()
+        && node.tags.is_empty()
+}
+
+/// A Folder with children and nothing else to say: no text, its real name, no properties, attributes or tags.
+fn plain_folder(node: &Node, key: Option<&str>) -> bool {
+    node.class == "Folder"
+        && node.source.is_none()
+        && node.model.is_none()
         && key == Some(node.name.as_str())
         && node.properties.is_empty()
         && node.attributes.is_empty()
@@ -398,16 +410,17 @@ fn read_folder(
             }
             node
         }
-        // A script's folder with nothing more to say than its file names has no `_.toml`.
-        None => match (init, key) {
-            (Some((_, class)), Some(k)) => Node {
-                class: class.to_string(),
+        // A folder with nothing more to say than its name and files has no `_.toml`: a script's folder takes its
+        // init file's class, and any other is a Folder (decision 0022).
+        None => match key {
+            Some(k) => Node {
+                class: init.map_or("Folder", |(_, class)| class).to_string(),
                 name: k.to_string(),
                 key: Some(k.to_string()),
                 id: next(ids),
                 ..Default::default()
             },
-            _ => bail!("{} is missing: every folder needs one", where_()),
+            None => bail!("{} is missing: the tree's top needs one", where_()),
         },
     };
 
