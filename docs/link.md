@@ -81,7 +81,7 @@ for example) is shown once, not on every try.
 ## Messages
 
 JSON text frames, each an object with an `op`. Every connection starts with `hello`. The server answers `welcome`, or
-`error` and closes the connection. `protocol` is 2, and is raised when a message changes shape. A plugin or command
+`error` and closes the connection. `protocol` is 3, and is raised when a message changes shape. A plugin or command
 with another protocol gets an error that says what to run. (2 added requests to Studio; a plugin installed before it
 is told to reinstall.)
 
@@ -93,6 +93,8 @@ is told to reinstall.)
 | `error` | server | `message` | |
 | `status` | command | | `status_report`: `version`, `port`, `studios` (each: `session`, `place`, `game`, `name`, `plugin`, `connected_secs`), `repos` (each: `root`, `place`), `refused` (each: `place`, `message`: a plugin turned away, for an old protocol, until one on that place links) |
 | `stop` | command | | `stopping`, then the server closes every connection and exits |
+| `subscribe` | command | `place` | `subscribed`, then an `event` (`place`, `event`) for each `notify` from that place's plugin, until the command leaves |
+| `notify` | plugin | `event` | (passed on to subscribers) |
 | `to_studio` | command | `place`, `request` (any JSON, for the plugin), `timeout_ms` (optional: instead of `server.request_timeout_ms`, for a push waiting on a click) | `from_studio` with `reply`, or `error` |
 | `request` | server | `id`, `request` | `reply` with `id` and `reply`, or `failed` with `id` and `message` |
 
@@ -120,6 +122,9 @@ The sync requests (`forge sync pull`):
 |---|---|---|
 | `classes` | `trees`: each tree's path from `forge.toml`, a list of names | `classes`: each class under the trees, with every property's `name`, `owner`, `engine` type, `serialized`, `read`, `write` and `deprecated`, from `ReflectionService` |
 | `drafts` | `trees` | `drafts`: per tree, the full names of scripts whose `Source` differs from the editor's text (an uncommitted draft) |
+| `watch` | `trees`, the read fields, `quietMs`, `pollMs` | `watching`; then the plugin sends `notify` with `{ tool: "sync", kind: "changed", tree: <index> }` whenever a tree has been quiet after a change |
+| `unwatch` | | `watching: 0` |
+| `clashes` | `lines` | `shown`: forge's window lists them |
 | `push` | `trees`, `pushTrees` (each tree's operations, `tools/sync/src/push.rs`), `summary`, `lines`, `drafts`, `timeoutMs` | `result`: `applied`, `cancelled` or `timeout`; sent once Apply or Cancel is clicked in Studio |
 | `read` | `trees`, `classes` (from the first reply), `properties` and `methods` (per class, each property's disk type), `models` (classes sent as a model file), `modelTimeoutMs`, `yieldEvery` | `trees`: per tree, `tree` (the instance tree in the JSON form `tools/sync/src/tree.rs` reads), `ms` (how long Studio took) and `drafts` (as above) |
 
