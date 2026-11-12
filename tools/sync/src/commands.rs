@@ -230,6 +230,17 @@ pub async fn pull(cx: &Cx, settings: &Settings, force: bool) -> Result<()> {
     Ok(())
 }
 
+/// Writes the trees' sourcemap from the files, with no Studio and no forge serve.
+pub fn sourcemap(cx: &Cx, output: Option<&Path>, non_scripts: bool) -> Result<()> {
+    let core = cx.game("forge sync")?;
+    let game = trees::read(&core)?;
+    let map = crate::sourcemap::build(&game, non_scripts)?;
+    let to = output.map_or_else(|| game.root.join("sourcemap.json"), Path::to_path_buf);
+    crate::sourcemap::write(&map, &to)?;
+    say!("wrote {} ({} trees)", to.display(), game.trees.len());
+    Ok(())
+}
+
 /// What differs between disk and Studio, tree by tree, going from disk to Studio.
 pub async fn diff(cx: &Cx, settings: &Settings) -> Result<()> {
     let mut session = Session::open(cx, settings).await?;

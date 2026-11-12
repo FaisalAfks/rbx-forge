@@ -1,12 +1,17 @@
 # Format, lint and type checks for the plugin's Luau (plugin/ and every tools/<name>/studio/). The tools are pinned in
 # rokit.toml. luau-lsp needs a sourcemap to follow `require(script.x)`, which forge writes from the same layout it
-# packs, and Roblox's types for plugins, pinned to the luau-lsp release. It runs when the plugin, a tool's studio/,
-# the packing that makes the sourcemap, or the tools' settings change (decision 0019).
+# packs, and Roblox's types for plugins, pinned to the luau-lsp release. It also checks `forge sync sourcemap` on the
+# fixture game: luau-lsp has to fail without the map and pass with it. It runs when the plugin, a tool's studio/,
+# the code that makes either sourcemap, the fixture or the tools' settings change (decision 0019).
 name: Luau
 
 on:
   pull_request:
     paths:
+      - "tools/sync/src/sourcemap.rs"
+      - "tools/sync/src/layout.rs"
+      - "tools/sync/src/packages.rs"
+      - "fixtures/**"
       - "plugin/**"
       - "tools/*/studio/**"
       - "forge/src/pack.rs"
@@ -17,6 +22,10 @@ on:
   push:
     branches: [main]
     paths:
+      - "tools/sync/src/sourcemap.rs"
+      - "tools/sync/src/layout.rs"
+      - "tools/sync/src/packages.rs"
+      - "fixtures/**"
       - "plugin/**"
       - "tools/*/studio/**"
       - "forge/src/pack.rs"
@@ -53,3 +62,15 @@ jobs:
           curl --fail --silent --show-error --location --output globalTypes.d.luau \
             "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LUAU_LSP_VERSION}/scripts/globalTypes.PluginSecurity.d.luau"
           luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=globalTypes.d.luau plugin tools
+      - name: Game sourcemap
+        if: ${{ !cancelled() }}
+        working-directory: fixtures/sourcemap-game
+        run: |
+          cargo run --quiet --locked --manifest-path ../../Cargo.toml -- sync sourcemap
+          curl --fail --silent --show-error --location --output globalTypes.d.luau "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LUAU_LSP_VERSION}/scripts/globalTypes.d.luau"
+          # Seen to fail first: without the map the requires can't resolve, so a pass below is the map's doing.
+          if luau-lsp analyze --platform=roblox --definitions=globalTypes.d.luau shared client; then
+            echo "luau-lsp passed without the sourcemap, so this check proves nothing"
+            exit 1
+          fi
+          luau-lsp analyze --platform=roblox --sourcemap=sourcemap.json --definitions=globalTypes.d.luau shared client

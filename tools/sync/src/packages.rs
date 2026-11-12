@@ -12,7 +12,7 @@
 //! A file Rojo would turn into another kind of instance (JSON, TOML, text, models, meta files) is an error naming it,
 //! so a package forge can't read whole never lands in Studio different from Rojo's. Files Rojo skips are skipped.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -76,6 +76,11 @@ const PROJECT_KEYS: [&str; 7] = [
 
 /// Reads a packages folder as the tree named `name` (the last name of its Studio path).
 pub fn read(folder: &Path, name: &str) -> Result<Node> {
+    Ok(read_with_files(folder, name)?.0)
+}
+
+/// The same, with the file each script's text came from (relative to `folder`), by id, for a sourcemap.
+pub fn read_with_files(folder: &Path, name: &str) -> Result<(Node, HashMap<u32, PathBuf>)> {
     if !folder.is_dir() {
         bail!(
             "{} isn't a folder: run `wally install` (or `pesde install`) first",
@@ -86,10 +91,11 @@ pub fn read(folder: &Path, name: &str) -> Result<Node> {
         root: folder.to_path_buf(),
         ids: 0,
         projects: BTreeSet::new(),
+        files: HashMap::new(),
     };
     let mut node = reader.folder(folder, name)?;
     node.name = name.to_string();
-    Ok(node)
+    Ok((node, reader.files))
 }
 
 struct Reader {
@@ -98,9 +104,26 @@ struct Reader {
     ids: u32,
     /// Project files being read, so a `$path` that leads back to its own project is an error, not a loop.
     projects: BTreeSet<PathBuf>,
+    /// The file each script's text was read from, relative to `root`, by id.
+    files: HashMap<u32, PathBuf>,
 }
 
 impl Reader {
+    /// Notes where a script's text came from. A project's `$path` gives absolute paths, so both sides are made
+    /// absolute and plain before the folder is taken off.
+    fn record(&mut self, id: u32, path: &Path) {
+        let abs = |p: &Path| {
+            std::path::absolute(p)
+                .map(|p| normal(&p))
+                .unwrap_or_else(|_| p.to_path_buf())
+        };
+        let file = abs(path);
+        let rel = file
+            .strip_prefix(abs(&self.root))
+            .map_or(file.clone(), Path::to_path_buf);
+        self.files.insert(id, rel);
+    }
+
     fn node(&mut self, class: &str, name: &str) -> Node {
         self.ids += 1;
         Node {
@@ -143,6 +166,7 @@ impl Reader {
             Some((file, class)) => {
                 let mut n = self.node(class, name);
                 n.source = Some(text(&dir.join(file))?);
+                self.record(n.id, &dir.join(file));
                 n
             }
             None => self.node("Folder", name),
@@ -177,6 +201,7 @@ impl Reader {
         };
         let mut node = self.node(class, &file_name[..file_name.len() - ending.len()]);
         node.source = Some(text(path)?);
+        self.record(node.id, path);
         Ok(Some(node))
     }
 

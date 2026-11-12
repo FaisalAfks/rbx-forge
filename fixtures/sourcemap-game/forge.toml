@@ -1,0 +1,16 @@
+# A small game for `forge sync sourcemap`: CI writes its sourcemap and checks it with luau-lsp (.github/workflows/luau.yml).
+place = 1
+
+[[sync]]
+studio = "ReplicatedStorage.Shared"
+disk = "shared"
+ignore = ["*.md"]
+
+[[sync]]
+studio = "StarterPlayer.StarterPlayerScripts.Client"
+disk = "client"
+
+[[sync]]
+studio = "ReplicatedStorage.Packages"
+disk = "Packages"
+kind = "packages"

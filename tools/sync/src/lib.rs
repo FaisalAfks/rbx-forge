@@ -15,6 +15,7 @@ pub mod push;
 pub mod schema;
 pub mod select;
 pub mod settings;
+pub mod sourcemap;
 pub mod text;
 pub mod tool;
 pub mod tree;

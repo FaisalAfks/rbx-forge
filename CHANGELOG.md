@@ -30,6 +30,9 @@
 - A tree can leave files alone: `ignore = ["*.md"]` in its `[[sync]]` takes `.gitignore`-style patterns, and matching
   files (READMEs beside the code) are never read, written or removed. Patterns that would hide forge's own files are
   refused (#78)
+- `forge sync sourcemap` writes a `sourcemap.json` in Rojo's format from the files alone, with no Studio, so luau-lsp
+  and selene resolve requires locally and in CI (`docs/sync/sourcemap.md`). Like Rojo's, it lists scripts and what
+  leads to them; `--non-scripts` lists everything. CI checks it with luau-lsp on a fixture game (#79)
 
 ## 0.1.1 - 2026-11-12
 

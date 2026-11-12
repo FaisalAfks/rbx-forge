@@ -45,6 +45,15 @@ enum SyncCommand {
         /// studio or disk: the side whose value wins.
         side: String,
     },
+    /// Write a sourcemap.json of the trees for luau-lsp and selene, from the files alone (no Studio needed).
+    Sourcemap {
+        /// Where to write it. By default sourcemap.json in the game's folder.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Include instances that aren't scripts and lead to none (Rojo's --include-non-scripts).
+        #[arg(long)]
+        non_scripts: bool,
+    },
     /// Make Studio match the files. The plan shows in Studio, and nothing changes until Apply is clicked there.
     Push {
         /// Push the trees from this folder (laid out like the game's, such as a backup) instead of the game's own.
@@ -71,6 +80,13 @@ impl Tool for SyncTool {
         if let SyncCommand::Pick { number, side } = &command {
             return watch::pick(*number, side);
         }
+        if let SyncCommand::Sourcemap {
+            output,
+            non_scripts,
+        } = &command
+        {
+            return commands::sourcemap(cx, output.as_deref(), *non_scripts);
+        }
         let s = Settings::from(cx.settings()?)?;
         block_on(async {
             match command {
@@ -80,7 +96,9 @@ impl Tool for SyncTool {
                 SyncCommand::Check { tree } => commands::check(cx, &s, tree.as_deref()).await,
                 SyncCommand::Watch => watch::watch(cx, &s).await,
                 SyncCommand::Push { from } => commands::push(cx, &s, from.as_deref()).await,
-                SyncCommand::Pick { .. } => unreachable!("handled above"),
+                SyncCommand::Pick { .. } | SyncCommand::Sourcemap { .. } => {
+                    unreachable!("handled above")
+                }
             }
         })
     }

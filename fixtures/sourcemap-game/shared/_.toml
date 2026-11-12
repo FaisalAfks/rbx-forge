@@ -1,0 +1,5 @@
+class = "Folder"
+name = "Shared"
+
+[Settings]
+class = "Configuration"
