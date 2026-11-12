@@ -333,6 +333,10 @@ pub async fn push(
         ),
         _ => bail!("the plugin answered the push with {reply}"),
     }
+    if reply["result"] != "applied" {
+        // Nothing was replaced, so there's nothing to keep.
+        let _ = std::fs::remove_dir_all(&backup);
+    }
     Ok(())
 }
 
