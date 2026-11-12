@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `forge mcp`, an MCP server over stdio for agents (#40, `docs/mcp.md`), built on the Rust MCP SDK (`rmcp`). Its tools
+  are status, pull, diff, push, check, clashes and pick; each runs the same forge command in the game's repo and
+  returns what it printed. A push from it applies only after Apply in Studio, unless the person in Studio set forge
+  not to ask
+
 - `forge sync watch` keeps Studio and the files in step both ways until Ctrl+C (#38, #39, `docs/sync/watch.md`).
   The plugin says when a tree has gone quiet after a change in Studio, and forge watches the folders. Either way,
   both copies are merged three ways against the state they last agreed on: a change on one side goes to the other,
