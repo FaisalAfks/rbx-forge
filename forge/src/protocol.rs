@@ -157,12 +157,12 @@ mod tests {
     #[test]
     fn a_studio_hello_reads_as_the_plugin_writes_it() {
         // The plugin's JSONEncode gives keys in any order and whole numbers without a decimal point.
-        let text = r#"{"name":"Place1","op":"hello","session":"A1","place":137580299958252,"role":"studio","game":10544115424,"protocol":1,"plugin":"0.0.0"}"#;
+        let text = r#"{"name":"Place1","op":"hello","session":"A1","place":123456789012345,"role":"studio","game":98765432109,"protocol":1,"plugin":"0.0.0"}"#;
         let Message::Hello(Hello::Studio(h)) = Message::from_text(text).unwrap() else {
             panic!("not a studio hello");
         };
-        assert_eq!(h.place, 137580299958252);
-        assert_eq!(h.game, 10544115424);
+        assert_eq!(h.place, 123456789012345);
+        assert_eq!(h.game, 98765432109);
         assert_eq!(h.name, "Place1");
     }
 

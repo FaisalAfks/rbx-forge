@@ -7,7 +7,7 @@ knows about one game. Commands find it the way git finds a repo: in the current 
 
 ```toml
 # The place id, as Studio shows it.
-place = 137580299958252
+place = 123456789012345
 
 # One [[sync]] per part of the place to keep on disk.
 [[sync]]
