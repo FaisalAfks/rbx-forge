@@ -313,11 +313,36 @@ fn attributes(node: &Node) -> Result<String> {
 /// The tree in `files`. Every node gets the disk name it was read from (`Node::key`) and a fresh id.
 pub fn read(files: &Files, schema: &Schema) -> Result<Node> {
     let mut ids = 0u32;
-    let mut root = read_folder(files, "", None, schema, &mut ids)?;
+    let mut root = read_folder(files, "", None, Some(schema), &mut ids)?;
     let mut paths = HashMap::new();
     index(&root, &mut Vec::new(), &mut paths);
     resolve(&mut root, &paths, "")?;
     Ok(root)
+}
+
+/// The tree in `files` without a schema: names, classes, disk names, attributes, tags and script text, with
+/// properties left out, since their types come from Studio. Enough for a sourcemap, and needs no Studio.
+pub fn outline(files: &Files) -> Result<Node> {
+    let mut ids = 0u32;
+    read_folder(files, "", None, None, &mut ids)
+}
+
+/// The file a leaf script's text is in, relative to the tree's folder: `<key><suffix>.luau` in its parent's `dir`.
+pub fn script_path(node: &Node, dir: &str, key: &str) -> Option<String> {
+    node.source.as_ref()?;
+    Some(join(
+        dir,
+        &format!("{key}{}.luau", script_suffix(&node.class)?),
+    ))
+}
+
+/// The file the text of a script with its own folder `dir` is in: that folder's init file.
+pub fn init_path(node: &Node, dir: &str) -> Option<String> {
+    node.source.as_ref()?;
+    Some(join(
+        dir,
+        &format!("{INIT}{}.luau", script_suffix(&node.class)?),
+    ))
 }
 
 /// What a folder holds directly: sub-folders, and files other than `_.toml`.
@@ -347,7 +372,7 @@ fn read_folder(
     files: &Files,
     dir: &str,
     key: Option<&str>,
-    schema: &Schema,
+    schema: Option<&Schema>,
     ids: &mut u32,
 ) -> Result<Node> {
     let props_path = join(dir, PROPS_FILE);
@@ -513,7 +538,7 @@ fn next(ids: &mut u32) -> u32 {
 fn read_body(
     table: &toml::Table,
     key: Option<&str>,
-    schema: &Schema,
+    schema: Option<&Schema>,
     top: bool,
 ) -> Result<(Node, Vec<(String, toml::Table)>)> {
     let class = table
@@ -521,7 +546,9 @@ fn read_body(
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("needs `class = \"...\"`"))?
         .to_string();
-    if !schema.knows(&class) {
+    if let Some(schema) = schema
+        && !schema.knows(&class)
+    {
         bail!("class {class:?} isn't in the schema");
     }
     let name = match (table.get("name"), key) {
@@ -574,7 +601,9 @@ fn read_body(
                     "{k:?} is a child inside a child's section; an instance with children is a folder"
                 ),
             },
-            _ => match schema.property(&class, k) {
+            // Without a schema (`outline`), properties are left out.
+            _ if schema.is_none() => {}
+            _ => match schema.and_then(|s| s.property(&class, k)) {
                 Some(ty) => {
                     node.properties.insert(
                         k.clone(),

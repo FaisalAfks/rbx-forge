@@ -24,6 +24,8 @@ files and move changes with forge; don't edit those parts in Studio through othe
    to ask. **Read the result line**: applied, cancelled, or timed out. Never report a push as done without
    "applied".
 4. `forge sync check <tree>` after structural changes, to confirm the tree survives the round trip.
+5. After adding, moving or renaming a script, `forge sync sourcemap` before running luau-lsp or selene, so requires
+   resolve (`docs/sync/sourcemap.md`). It reads only the files; no Studio needed.
 
 ## Taking Studio's changes
 
