@@ -27,7 +27,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - name: Build
         run: cargo build --release --locked -p forge
@@ -41,7 +41,7 @@ jobs:
           cd pack
           zip="forge-$version-${{ matrix.os }}-x86_64.zip"
           if [ "${{ matrix.os }}" = windows ]; then 7z a "$zip" "${{ matrix.exe }}"; else zip "$zip" "${{ matrix.exe }}"; fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: forge-${{ matrix.os }}
           path: pack/*
@@ -50,8 +50,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
