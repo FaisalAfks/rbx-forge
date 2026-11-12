@@ -11,7 +11,12 @@ packages in [packages.md](packages.md), and a sourcemap for luau-lsp and selene 
 ## 1. Install forge (once per PC)
 
 1. Download `forge.exe` from the latest [release](https://github.com/FaisalAfks/rbx-forge/releases), and put it in a
-   folder on your `PATH` (or run it by its full path).
+   folder on your `PATH` (or run it by its full path). With [rokit](https://github.com/rojo-rbx/rokit), a game's repo
+   can pin it instead, which is also how its CI gets forge (Windows and Linux builds):
+
+   ```bash
+   rokit add FaisalAfks/rbx-forge forge
+   ```
 2. Install the plugin into Studio, then restart Studio (it loads plugins only when it starts):
 
    ```bash

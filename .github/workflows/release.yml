@@ -1,28 +1,63 @@
-# A tag vX.Y.Z on main builds forge for Windows and makes the GitHub release with it attached, with notes generated
-# from the PR labels. forge.exe carries its Studio plugin inside (`forge plugin install` writes it out).
+# A tag vX.Y.Z on main builds forge for Windows and Linux and makes the GitHub release, with notes generated from the PR
+# labels. Each build is a zip named for rokit (forge-<version>-<os>-x86_64.zip, holding `forge` or `forge.exe`), so a
+# game's rokit.toml can install forge, CI included; forge.exe is attached on its own too, for downloading by hand.
+# forge carries its Studio plugin inside (`forge plugin install` writes it out). Run by hand (workflow_dispatch), it
+# only builds the zips, to check them before a tag.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - runner: windows-latest
+            os: windows
+            exe: forge.exe
+          - runner: ubuntu-latest
+            os: linux
+            exe: forge
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: Swatinem/rust-cache@v2
       - name: Build
         run: cargo build --release --locked -p forge
-      - name: Release
+      - name: Pack
         shell: bash
         run: |
-          cp target/release/forge.exe forge.exe
+          version="${GITHUB_REF_NAME#v}"
+          [ "$GITHUB_REF_TYPE" = tag ] || version=dev
+          mkdir pack
+          cp "target/release/${{ matrix.exe }}" "pack/${{ matrix.exe }}"
+          cd pack
+          zip="forge-$version-${{ matrix.os }}-x86_64.zip"
+          if [ "${{ matrix.os }}" = windows ]; then 7z a "$zip" "${{ matrix.exe }}"; else zip "$zip" "${{ matrix.exe }}"; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ matrix.os }}
+          path: pack/*
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release
+        run: |
           gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes \
-            --verify-tag ${{ contains(github.ref_name, '-') && '--prerelease' || '' }} forge.exe
+            --verify-tag ${{ contains(github.ref_name, '-') && '--prerelease' || '' }} dist/*.zip dist/forge.exe
         env:
           GH_TOKEN: ${{ github.token }}
