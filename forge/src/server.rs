@@ -22,7 +22,7 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::{Error as WsError, Message as Frame};
 
 use crate::protocol::{
-    CliHello, Hello, Message, PROTOCOL, Repo, StatusReport, Studio, StudioHello,
+    CliHello, Hello, Message, PROTOCOL, Refused, Repo, StatusReport, Studio, StudioHello,
 };
 
 /// How long a new connection has to say hello. Both of forge's sides send it at once, so only a stray connection
@@ -72,6 +72,8 @@ struct State {
     repos: BTreeSet<Repo>,
     /// Requests sent to a Studio and not answered yet: the Studio's id, and where the answer goes.
     pending: HashMap<u64, (u64, oneshot::Sender<Answer>)>,
+    /// Places whose plugin was turned away (an old protocol), and why, until a plugin on that place links.
+    refused: BTreeMap<u64, String>,
 }
 
 type Shared = Arc<Mutex<State>>;
@@ -173,6 +175,12 @@ async fn serve_connection(
                  and restart Studio",
                 h.protocol
             );
+            // Kept so `forge status` and a command asking for this place can say why it isn't linked.
+            state
+                .lock()
+                .expect("state lock")
+                .refused
+                .insert(h.place, msg.clone());
             refuse(&mut socket, &msg).await
         }
         Hello::Cli(h) if h.protocol != PROTOCOL => {
@@ -217,6 +225,7 @@ async fn serve_studio(
             requests: tx,
         };
         s.studios.insert(id, linked);
+        s.refused.remove(&hello.place);
         id
     };
     let who = format!(
@@ -313,10 +322,13 @@ async fn ask_studio(state: &Shared, place: u64, request: Json, config: Config) -
             .collect();
         let (studio, sender) = match on_place.as_slice() {
             [] => {
-                return Err(format!(
-                    "no Studio with place {place} is linked to forge serve: open the place in Studio, with forge's \
-                     plugin installed (`forge status` lists what's linked)"
-                ));
+                return Err(match s.refused.get(&place) {
+                    Some(why) => format!("the Studio with place {place} couldn't link: {why}"),
+                    None => format!(
+                        "no Studio with place {place} is linked to forge serve: open the place in Studio, with \
+                         forge's plugin installed (`forge status` lists what's linked)"
+                    ),
+                });
             }
             [(id, linked)] => (*id, linked.requests.clone()),
             many => {
@@ -370,6 +382,14 @@ fn report(state: &Shared, port: u16) -> StatusReport {
             })
             .collect(),
         repos: s.repos.iter().cloned().collect(),
+        refused: s
+            .refused
+            .iter()
+            .map(|(place, message)| Refused {
+                place: *place,
+                message: message.clone(),
+            })
+            .collect(),
     }
 }
 

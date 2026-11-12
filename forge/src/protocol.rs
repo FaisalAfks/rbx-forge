@@ -101,6 +101,15 @@ pub struct StatusReport {
     pub studios: Vec<Studio>,
     /// Every repo a command has run in since the server started.
     pub repos: Vec<Repo>,
+    /// Places whose plugin the server turned away, and why.
+    #[serde(default)]
+    pub refused: Vec<Refused>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Refused {
+    pub place: u64,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -171,6 +180,10 @@ mod tests {
                     connected_secs: 5,
                 }],
                 repos: vec![],
+                refused: vec![Refused {
+                    place: 5,
+                    message: "old".into(),
+                }],
             }),
             Message::Stop,
             Message::Stopping,

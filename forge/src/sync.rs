@@ -87,6 +87,7 @@ pub async fn pull(settings: &Settings, settings_file: Option<&Path>, force: bool
         let node = Node::from_json(&sent["tree"]).with_context(|| format!("{name} from Studio"))?;
         let files =
             layout::write(&node, &selection.schema).with_context(|| format!("{name} on disk"))?;
+        read_back(&name, &node, &files, &selection.schema)?;
         let folder = game.root.join(&tree.disk);
         let plan =
             disk::plan(&folder, &files, force).with_context(|| format!("can't pull {name}"))?;
@@ -120,6 +121,35 @@ pub async fn pull(settings: &Settings, settings_file: Option<&Path>, force: bool
         for p in &selection.unsynced {
             println!("  {p}");
         }
+    }
+    Ok(())
+}
+
+/// Reads the files back before any is written: every instance has to be there, and writing what was read has to give
+/// the same bytes. A tree the files don't hold whole stops the pull instead of landing on disk (decision 0011: the
+/// round trip on real data is the check that catches what reflection doesn't list).
+fn read_back(
+    name: &str,
+    sent: &Node,
+    files: &layout::Files,
+    schema: &forge_sync::schema::Schema,
+) -> Result<()> {
+    let read = layout::read(files, schema)
+        .with_context(|| format!("{name}: forge can't read back the files it made"))?;
+    let (sent_count, read_count) = (sent.walk().len(), read.walk().len());
+    if sent_count != read_count {
+        bail!("{name}: Studio sent {sent_count} instances, but the files hold {read_count}");
+    }
+    let again = layout::write(&read, schema)
+        .with_context(|| format!("{name}: writing the read-back tree"))?;
+    if let Some(path) = files
+        .keys()
+        .chain(again.keys())
+        .find(|p| files.get(*p) != again.get(*p))
+    {
+        bail!(
+            "{name}: {path} doesn't come out the same when its tree is read back and written again"
+        );
     }
     Ok(())
 }

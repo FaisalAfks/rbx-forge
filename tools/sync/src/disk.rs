@@ -116,27 +116,66 @@ fn remove_empty_parents(root: &Path, file: &Path) {
 }
 
 /// Which of `paths` (relative to `folder`) git has uncommitted changes for. Untracked files don't count: they're an
-/// earlier pull nobody committed yet. Outside a git repo, or without git, nothing does.
+/// earlier pull nobody committed yet. Without git, or outside a git repo, nothing does; any other git failure stops
+/// the pull, since a guard that fails open would let it overwrite work.
+///
+/// git is asked once about the whole folder rather than about each path, so a pull that touches thousands of files
+/// can't run past the command-line length limit.
 fn uncommitted(folder: &Path, paths: &[&String]) -> Result<Vec<String>> {
     if paths.is_empty() || !folder.is_dir() {
         return Ok(vec![]);
     }
-    let out = match Command::new("git")
-        .arg("-C")
-        .arg(folder)
-        .args(["status", "--porcelain=v1", "-z", "--"])
-        .args(paths)
-        .output()
-    {
-        Ok(out) if out.status.success() => out,
-        _ => return Ok(vec![]),
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(folder)
+            .args(args)
+            .output()
     };
+    // Where the folder is in its repo: porcelain paths are from the repo's top, not from the folder.
+    let prefix = match git(&["rev-parse", "--show-prefix"]) {
+        Err(_) => return Ok(vec![]), // no git on this system
+        Ok(out) if !out.status.success() => return Ok(vec![]), // not in a repo
+        Ok(out) => String::from_utf8_lossy(&out.stdout)
+            .trim_end_matches(['\n', '\r'])
+            .to_string(),
+    };
+    let out = git(&[
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=no",
+        "--",
+        ".",
+    ])
+    .context("can't run git to check for uncommitted changes")?;
+    if !out.status.success() {
+        bail!(
+            "git couldn't say whether {} has uncommitted changes: {}",
+            folder.display(),
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+    }
+    let touched: std::collections::HashSet<&str> = paths.iter().map(|p| p.as_str()).collect();
     let text = String::from_utf8_lossy(&out.stdout);
-    Ok(text
-        .split('\0')
-        .filter(|entry| entry.len() > 3 && !entry.starts_with("??"))
-        .map(|entry| entry[3..].to_string())
-        .collect())
+    let mut entries = text.split('\0');
+    let mut dirty = Vec::new();
+    while let Some(entry) = entries.next() {
+        if entry.len() < 4 {
+            continue;
+        }
+        let (status, path) = entry.split_at(3);
+        // A rename or copy is followed by the path it came from, which isn't an entry of its own.
+        if status.starts_with('R') || status.starts_with('C') {
+            entries.next();
+        }
+        if let Some(rel) = path.strip_prefix(prefix.as_str())
+            && touched.contains(rel)
+        {
+            dirty.push(rel.to_string());
+        }
+    }
+    Ok(dirty)
 }
 
 #[cfg(test)]
@@ -241,7 +280,11 @@ mod tests {
         if !git(&["init", "-q"]) {
             return; // no git on this system: the guard can't apply
         }
-        pull(&dir, &files(&[("_.toml", "x")]));
+        // The synced folder sits below the repo's top, as in a game repo, so git's paths have a prefix to match.
+        let folder = dir.join("game").join("hud");
+        let pulled = files(&[("_.toml", "x"), ("A/_.toml", "a"), ("A/S.luau", "s")]);
+        pull(&folder, &pulled);
+        std::fs::write(dir.join("README.md"), "outside the folder").unwrap();
         assert!(git(&["add", "."]));
         assert!(git(&[
             "-c",
@@ -252,11 +295,33 @@ mod tests {
             "-qm",
             "pull"
         ]));
-        std::fs::write(dir.join("_.toml"), "edited by hand").unwrap();
-        let err = plan(&dir, &files(&[("_.toml", "from studio")]), false)
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("_.toml"), "{err}");
-        assert!(plan(&dir, &files(&[("_.toml", "from studio")]), true).is_ok());
+
+        // A change outside the folder, or to a file pull leaves alone, doesn't stop it.
+        std::fs::write(dir.join("README.md"), "edited").unwrap();
+        std::fs::write(folder.join("A").join("S.luau"), "edited").unwrap();
+        let same_script = files(&[("_.toml", "new"), ("A/_.toml", "a"), ("A/S.luau", "edited")]);
+        assert!(plan(&folder, &same_script, false).is_ok());
+
+        // A change to a file pull would write or remove does.
+        let new = files(&[
+            ("_.toml", "new"),
+            ("A/_.toml", "a"),
+            ("A/S.luau", "from studio"),
+        ]);
+        let err = plan(&folder, &new, false).unwrap_err().to_string();
+        assert!(err.contains("A/S.luau"), "{err}");
+        let gone = files(&[("_.toml", "new")]);
+        let err = plan(&folder, &gone, false).unwrap_err().to_string();
+        assert!(err.contains("A/S.luau"), "{err}");
+        assert!(plan(&folder, &new, true).is_ok());
+    }
+
+    #[test]
+    fn outside_a_repo_there_is_nothing_to_guard() {
+        let dir = temp("norepo");
+        // The temp folder may itself be inside some repo on a dev PC; a fresh folder under it still answers.
+        let folder = dir.join("hud");
+        pull(&folder, &files(&[("_.toml", "x")]));
+        assert!(uncommitted(&folder, &[&"_.toml".to_string()]).is_ok());
     }
 }

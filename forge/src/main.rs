@@ -245,6 +245,9 @@ fn status_text(report: &StatusReport) -> String {
             );
         }
     }
+    for r in &report.refused {
+        let _ = writeln!(out, "refused: a Studio on place {}: {}", r.place, r.message);
+    }
     for r in &report.repos {
         if !report.studios.iter().any(|s| s.place == r.place) {
             let _ = writeln!(

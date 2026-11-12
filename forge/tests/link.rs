@@ -188,6 +188,8 @@ fn an_old_plugin_is_told_to_reinstall() {
     let (_studio, reply) = server.studio(1, 999);
     assert!(reply.contains(r#""op":"error""#), "{reply}");
     assert!(reply.contains("forge plugin install"), "{reply}");
+    let status = text(&server.forge(&["status"], &server.dir));
+    assert!(status.contains("refused: a Studio on place 1"), "{status}");
 }
 
 #[test]
