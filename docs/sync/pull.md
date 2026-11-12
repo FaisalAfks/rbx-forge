@@ -42,6 +42,19 @@ not synced, because plugins can't read and write them (they stay as they are in 
   BaseScript.RunContext (Enum)
 ```
 
+**Scripts with an uncommitted draft are listed after the pull.** With collaborative editing, an edit stays a draft
+until it's committed in Studio's Drafts window. Until then the script's `Source` keeps the last committed text,
+which is what collaborators and the published game get, while the editor (and so the file on disk) has the draft.
+Plugins can't read or commit drafts, so forge finds them by comparing the two and says so (#20):
+
+```
+32 scripts have an uncommitted draft. forge has the editor's text for them, but collaborators and the published game
+get the last committed text until each draft is committed in Studio's Drafts window:
+  ReplicatedStorage.Shared.Net.Remotes
+```
+
+`forge sync status` lists the same scripts without pulling, and says whether the game's Studio is linked.
+
 ## What it writes
 
 - **Each tree's folder**, in layout C. Only files whose bytes changed are written, so a second pull with nothing changed

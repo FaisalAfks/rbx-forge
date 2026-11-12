@@ -36,6 +36,7 @@ cargo run -- status                      # forge serve (started if needed) and t
 cargo run -- plugin install              # pack plugin/ into forge.rbxmx in Studio's Plugins folder
 cargo run -- stop                        # stop forge serve (a running one locks target/debug/forge.exe)
 cargo run -- sync pull                   # in a game repo: write its trees from Studio to disk
+cargo run -- sync status                 # in a game repo: is its Studio linked, which scripts have drafts
 rokit install                            # the Luau tools (rokit.toml); then, as CI does:
 stylua --check plugin tools && selene plugin tools
 ```

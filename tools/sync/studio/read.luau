@@ -58,6 +58,33 @@ local function saved(root: Instance): { Instance }
 	return out
 end
 
+-- Whether a script has an uncommitted draft: with collaborative editing, `Source` keeps the last committed text while
+-- the editor has the draft, which plugins can't read or commit (decision 0009, #20).
+local function hasDraft(script: LuaSourceContainer, editorText: string): boolean
+	local ok, committed = pcall(function()
+		return (script :: any).Source
+	end)
+	return ok and committed ~= editorText
+end
+
+-- Every script under the trees with an uncommitted draft, by full name, per tree.
+function read.drafts(trees: { { string } }): Json
+	local out = {}
+	for _, path in trees do
+		local list = {}
+		for _, inst in saved(resolve(path)) do
+			if inst:IsA("LuaSourceContainer") then
+				local script = inst :: LuaSourceContainer
+				if hasDraft(script, ScriptEditorService:GetEditorSource(script)) then
+					table.insert(list, inst:GetFullName())
+				end
+			end
+		end
+		table.insert(out, list)
+	end
+	return { drafts = out }
+end
+
 function read.classes(trees: { { string } }): Json
 	local classes = {}
 	for _, path in trees do
@@ -292,6 +319,7 @@ function read.trees(request: ReadRequest): Json
 			ids[inst] = nextId
 		end
 		local nodes: { [Instance]: Json } = {}
+		local drafts = {}
 		for _, inst in list do
 			local class = inst.ClassName
 			if not known[class] then
@@ -337,7 +365,11 @@ function read.trees(request: ReadRequest): Json
 				children = {},
 			}
 			if inst:IsA("LuaSourceContainer") then
-				node.source = ScriptEditorService:GetEditorSource(inst :: LuaSourceContainer)
+				local script = inst :: LuaSourceContainer
+				node.source = ScriptEditorService:GetEditorSource(script)
+				if hasDraft(script, node.source) then
+					table.insert(drafts, where)
+				end
 			end
 			if isModel[class] then
 				node.model = model(inst, request.modelTimeoutMs / 1000)
@@ -353,7 +385,7 @@ function read.trees(request: ReadRequest): Json
 				task.wait()
 			end
 		end
-		table.insert(out, { tree = nodes[list[1]], ms = (os.clock() - started) * 1000 })
+		table.insert(out, { tree = nodes[list[1]], ms = (os.clock() - started) * 1000, drafts = drafts })
 	end
 	return { trees = out }
 end

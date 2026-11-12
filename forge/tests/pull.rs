@@ -107,6 +107,7 @@ impl Server {
                 let request = message["request"].clone();
                 let reply = match request["action"].as_str() {
                     Some("classes") => classes(),
+                    Some("drafts") => json!({ "drafts": [["StarterGui.Hud.Main"]] }),
                     _ => tree(),
                 };
                 let answer = json!({ "op": "reply", "id": message["id"], "reply": reply });
@@ -146,7 +147,7 @@ fn tree() -> Json {
         "properties": { "Size": { "type": "UDim2", "value": [0, 340, 0, 66] } }, "attributes": [], "tags": [],
         "children": [ { "id": 2, "class": "ModuleScript", "name": "Main", "properties": [], "attributes": [],
                         "tags": [], "source": SCRIPT } ]
-    } } ] })
+    }, "drafts": ["StarterGui.Hud.Main"] } ] })
 }
 
 fn game_repo(server: &Server) -> PathBuf {
@@ -178,6 +179,8 @@ fn pull_writes_the_tree_and_a_second_pull_changes_nothing() {
         out.contains("BaseScript.RunContext (Enum)"),
         "the unwritable property is reported: {out}"
     );
+    assert!(out.contains("1 scripts have an uncommitted draft"), "{out}");
+    assert!(out.contains("  StarterGui.Hud.Main"), "{out}");
 
     let classes_request = requests.recv_timeout(Duration::from_secs(5)).unwrap();
     assert_eq!(classes_request["trees"], json!([["StarterGui", "Hud"]]));
@@ -264,4 +267,20 @@ fn pulled_scripts_keep_their_bytes_through_git_with_autocrlf() {
         props,
         std::fs::read(repo.join("ui").join("hud").join("_.toml")).unwrap()
     );
+}
+
+#[test]
+fn sync_status_lists_drafts() {
+    let server = Server::new("status");
+    let repo = game_repo(&server);
+    assert!(server.forge(&["status"], &repo).0);
+    let _requests = server.studio(42);
+    let (ok, out) = server.forge(&["sync", "status"], &repo);
+    assert!(ok, "{out}");
+    assert!(out.contains("place 42: linked to Studio"), "{out}");
+    assert!(
+        out.contains("StarterGui.Hud -> ui/hud: 1 scripts with a draft"),
+        "{out}"
+    );
+    assert!(out.contains("  StarterGui.Hud.Main"), "{out}");
 }

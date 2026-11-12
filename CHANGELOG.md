@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pull lists scripts with an uncommitted draft, and `forge sync status` lists them without pulling (#20). A draft
+  is found as a script whose `Source` (the last committed text) differs from the editor's text, since plugins can't
+  read drafts. The files hold the editor's text; the warning says collaborators and the published game still get
+  the committed one. Pull now shares its Studio session and tree reading with the commands to come
+
 - `forge sync pull` (#34, `docs/sync/pull.md`) writes each tree in `forge.toml` from Studio to disk in layout C.
   - Studio lists the classes under the trees. forge then chooses which properties to read from Studio's own
     reflection data and `tools/sync/properties.toml`: saved and writable ones, twins, method-only values, and model
