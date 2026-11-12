@@ -21,6 +21,9 @@ export type Connection = {
 -- Answers one request the server passes on from a forge command, or errors with why it can't.
 export type Handler = (request: any) -> any
 
+-- Told when the link's state changes: "linked", "trying" or "off", and a detail line.
+export type OnStatus = (state: string, detail: string) -> ()
+
 local link = {}
 
 -- What the plugin tells the server about this Studio.
@@ -37,8 +40,15 @@ local function hello(settings: Settings, session: string): string
 	})
 end
 
-function link.start(settings: Settings, handler: Handler): Connection
+function link.start(settings: Settings, handler: Handler, onStatus: OnStatus): Connection
 	local running = true
+	local shown = ""
+	local function status(state: string, detail: string)
+		if `{state}|{detail}` ~= shown then
+			shown = `{state}|{detail}`
+			onStatus(state, detail)
+		end
+	end
 	local current: WebStreamClient? = nil
 	-- A server error is shown once, not on every try (an old plugin keeps getting the same one).
 	local lastError: string? = nil
@@ -75,9 +85,11 @@ function link.start(settings: Settings, handler: Handler): Connection
 		elseif message.op == "welcome" then
 			lastError = nil
 			print(`forge: linked to forge serve {message.version} on port {settings.port}`)
+			status("linked", `forge serve {message.version}, port {settings.port}`)
 		elseif message.op == "error" and message.message ~= lastError then
 			lastError = message.message
 			warn(`forge: {message.message}`)
+			status("trying", message.message)
 		end
 	end
 
@@ -121,9 +133,11 @@ function link.start(settings: Settings, handler: Handler): Connection
 	end
 
 	task.spawn(function()
+		status("trying", `port {settings.port}`)
 		while running do
 			if try() and running then
 				print("forge: lost the link to forge serve, trying again in the background")
+				status("trying", `lost the link; trying port {settings.port} again`)
 			end
 			if running then
 				task.wait(settings.retrySeconds)
@@ -134,6 +148,7 @@ function link.start(settings: Settings, handler: Handler): Connection
 	return {
 		stop = function()
 			running = false
+			status("off", "")
 			local client = current
 			if client then
 				pcall(client.Close, client)

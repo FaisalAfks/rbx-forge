@@ -22,3 +22,4 @@ A decision is changed by a new record that replaces the old one, never by editin
 | [0015](0015-how-forge-runs.md) | One forge server per PC, a packed plugin, pushes confirmed in Studio | 2026-11-11 |
 | [0016](0016-ui-capture.md) | Seeing UI: forge stages a screen, captures it itself, and crops it | 2026-11-11 |
 | [0017](0017-build-without-studio.md) | Places are built without Studio, by writing Roblox's file format in Rust | 2026-11-11 |
+| [0018](0018-apply-pushes-setting.md) | When a push asks for Apply is a setting in Studio (reverses part of 0015) | 2026-11-12 |

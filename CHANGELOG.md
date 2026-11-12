@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- forge's plugin has a button in Studio's Plugins tab and a proper window (#59): a home page with the link's state, a
+  push waiting for Apply, and recent activity, with settings and a push's full plan as their own views. Settings live in
+  Studio only: "Apply pushes" (ask every time, ask for large pushes, or never ask) and "Connect automatically". Applying
+  without a click reverses part of decision 0015 (decision 0018); the plan is still printed and the backup still written
+
 - `forge sync check [tree]` builds a copy of each tree in Studio from its files, reads the copy and compares it with
   the original value by value, then takes the copy away inside a cancelled undo recording (#37,
   `docs/sync/check.md`). Each difference is one line, and any difference fails the command

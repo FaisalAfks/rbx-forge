@@ -23,6 +23,7 @@ local function push(request: any, context: Context): any
 	end
 	local choice = context.confirm({
 		title = "forge sync push",
+		changes = request.changes,
 		summary = `Push from the files: {request.summary}`,
 		lines = request.lines,
 		warnings = warnings,

@@ -383,10 +383,13 @@ pub async fn push(
             say!("  {d}");
         }
     }
-    say!("waiting for Apply or Cancel in Studio (forge's push window)...");
+    say!(
+        "sent to Studio: forge's window waits for Apply, unless its Apply pushes setting says not to ask..."
+    );
     let request = json!({
         "pushTrees": trees,
         "summary": summary,
+        "changes": total.changed + total.added + total.removed + total.moved,
         "lines": lines,
         "drafts": drafts,
         "timeoutMs": settings.sync.confirm_timeout_ms,
