@@ -44,9 +44,14 @@ pub async fn connect(
              (`forge config`)"
         )
     };
-    let (socket, _) = tokio_tungstenite::client_async(format!("ws://127.0.0.1:{port}"), stream)
-        .await
-        .map_err(|_| not_forge())?;
+    let limits = crate::server::websocket_config(settings.server.max_message_bytes());
+    let (socket, _) = tokio_tungstenite::client_async_with_config(
+        format!("ws://127.0.0.1:{port}"),
+        stream,
+        Some(limits),
+    )
+    .await
+    .map_err(|_| not_forge())?;
     let mut link = Link { socket, started };
     let hello = Message::Hello(Hello::Cli(CliHello {
         protocol: PROTOCOL,
@@ -77,6 +82,19 @@ impl Link {
                 Some(Ok(_)) => {}
                 Some(Err(err)) => return Err(err).context("lost the connection to forge serve"),
             }
+        }
+    }
+
+    /// Asks the Studio that has `place` open, through the server, and returns its reply.
+    pub async fn ask_studio(
+        &mut self,
+        place: u64,
+        request: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        match self.request(&Message::ToStudio { place, request }).await? {
+            Message::FromStudio { reply } => Ok(reply),
+            Message::Error { message } => bail!("{message}"),
+            other => bail!("forge serve answered a request for Studio with {other:?}"),
         }
     }
 }

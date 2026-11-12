@@ -310,6 +310,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs 7.0.0",
+ "forge-sync",
  "futures-util",
  "rbx_dom_weak",
  "rbx_xml",

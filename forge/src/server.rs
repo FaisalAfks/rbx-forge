@@ -1,9 +1,10 @@
 //! `forge serve`: the one server per PC that holds forge's link (decisions 0012 and 0015). It listens on 127.0.0.1
 //! only. Each Studio's plugin connects and stays connected; forge's commands connect, ask, and leave. The server
-//! keeps who is connected and which repos commands ran in, so it can match places to repos. Messages are in
-//! `protocol.rs` and docs/link.md.
+//! keeps who is connected and which repos commands ran in, so it can match places to repos, and passes a command's
+//! request to the Studio on its place and the answer back. It doesn't know what tools ask: the plugin does. Messages
+//! are in `protocol.rs` and docs/link.md.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::Write;
 use std::net::Ipv4Addr;
 use std::path::Path;
@@ -12,11 +13,13 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use futures_util::{SinkExt, StreamExt};
+use serde_json::Value as Json;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::watch;
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio_tungstenite::WebSocketStream;
-use tokio_tungstenite::tungstenite::Message as Frame;
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+use tokio_tungstenite::tungstenite::{Error as WsError, Message as Frame};
 
 use crate::protocol::{
     CliHello, Hello, Message, PROTOCOL, Repo, StatusReport, Studio, StudioHello,
@@ -31,12 +34,44 @@ const STOP_WAIT: Duration = Duration::from_secs(2);
 
 type Socket = WebSocketStream<TcpStream>;
 
+/// The server's settings, from forge's settings file.
+#[derive(Debug, Clone, Copy)]
+pub struct Config {
+    pub port: u16,
+    /// How long a command's request may wait for Studio's answer.
+    pub request_timeout: Duration,
+    /// The largest message the server takes or sends; a bigger one closes that connection.
+    pub max_message_bytes: usize,
+}
+
+/// WebSocket limits for one side of the link. Studio sends each message as one frame, so both limits are the
+/// message size.
+pub fn websocket_config(max_bytes: usize) -> WebSocketConfig {
+    let mut c = WebSocketConfig::default();
+    c.max_message_size = Some(max_bytes);
+    c.max_frame_size = Some(max_bytes);
+    c
+}
+
+/// A Studio linked to the server.
+struct Linked {
+    hello: StudioHello,
+    since: Instant,
+    /// Requests for this Studio, by id; its connection sends them on.
+    requests: mpsc::UnboundedSender<(u64, Json)>,
+}
+
+/// Studio's answer to a request: its reply, or why it failed.
+type Answer = Result<Json, String>;
+
 /// What the server knows, shared by every connection.
 #[derive(Default)]
 struct State {
     next_id: u64,
-    studios: BTreeMap<u64, (StudioHello, Instant)>,
+    studios: BTreeMap<u64, Linked>,
     repos: BTreeSet<Repo>,
+    /// Requests sent to a Studio and not answered yet: the Studio's id, and where the answer goes.
+    pending: HashMap<u64, (u64, oneshot::Sender<Answer>)>,
 }
 
 type Shared = Arc<Mutex<State>>;
@@ -47,7 +82,8 @@ static LOG: OnceLock<Mutex<std::fs::File>> = OnceLock::new();
 /// Runs the server until a command sends `stop`. With `log`, its lines go to that file instead of standard error.
 /// The file is overwritten once the port is taken, so it holds the running server's lines only; a server that can't
 /// take the port adds its reason at the end instead, leaving the running server's lines in place.
-pub async fn run(port: u16, log_to: Option<&Path>) -> Result<()> {
+pub async fn run(config: Config, log_to: Option<&Path>) -> Result<()> {
+    let port = config.port;
     let bound = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await;
     if let Some(path) = log_to {
         let mut options = std::fs::OpenOptions::new();
@@ -86,7 +122,7 @@ pub async fn run(port: u16, log_to: Option<&Path>) -> Result<()> {
         tokio::select! {
             accepted = listener.accept() => match accepted {
                 Ok((stream, _)) => {
-                    connections.spawn(serve_connection(stream, state.clone(), stop_tx.clone(), port));
+                    connections.spawn(serve_connection(stream, state.clone(), stop_tx.clone(), config));
                 }
                 Err(err) => log(&format!("a connection failed before it started: {err}")),
             },
@@ -105,8 +141,14 @@ pub async fn run(port: u16, log_to: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-async fn serve_connection(stream: TcpStream, state: Shared, stop: watch::Sender<bool>, port: u16) {
-    let mut socket = match tokio_tungstenite::accept_async(stream).await {
+async fn serve_connection(
+    stream: TcpStream,
+    state: Shared,
+    stop: watch::Sender<bool>,
+    config: Config,
+) {
+    let limits = websocket_config(config.max_message_bytes);
+    let mut socket = match tokio_tungstenite::accept_async_with_config(stream, Some(limits)).await {
         Ok(socket) => socket,
         Err(err) => return log(&format!("not a WebSocket connection: {err}")),
     };
@@ -150,24 +192,31 @@ async fn serve_connection(stream: TcpStream, state: Shared, stop: watch::Sender<
         }
         Hello::Cli(h) => {
             if send(&mut socket, &welcome).await.is_ok() {
-                serve_cli(socket, h, state, stop, port).await;
+                serve_cli(socket, h, state, stop, config).await;
             }
         }
     }
 }
 
-/// Holds a plugin's connection until it closes or the server stops. Later steps add the messages Studio sends.
+/// Holds a plugin's connection until it closes or the server stops: sends it the requests meant for it, and passes
+/// its answers back.
 async fn serve_studio(
     mut socket: Socket,
     hello: StudioHello,
     state: Shared,
     mut stop: watch::Receiver<bool>,
 ) {
+    let (tx, mut requests) = mpsc::unbounded_channel();
     let id = {
         let mut s = state.lock().expect("state lock");
         s.next_id += 1;
         let id = s.next_id;
-        s.studios.insert(id, (hello.clone(), Instant::now()));
+        let linked = Linked {
+            hello: hello.clone(),
+            since: Instant::now(),
+            requests: tx,
+        };
+        s.studios.insert(id, linked);
         id
     };
     let who = format!(
@@ -179,6 +228,8 @@ async fn serve_studio(
         tokio::select! {
             message = next_message(&mut socket) => match message {
                 None => break,
+                Some(Ok(Message::Reply { id: request, reply })) => answer(&state, request, Ok(reply)),
+                Some(Ok(Message::Failed { id: request, message })) => answer(&state, request, Err(message)),
                 Some(Ok(other)) => {
                     let reply = Message::Error { message: format!("forge serve doesn't take {other:?} from Studio") };
                     if send(&mut socket, &reply).await.is_err() {
@@ -187,14 +238,30 @@ async fn serve_studio(
                 }
                 Some(Err(err)) => log(&format!("{who}: {err}")),
             },
+            Some((request, body)) = requests.recv() => {
+                if send(&mut socket, &Message::Request { id: request, request: body }).await.is_err() {
+                    break;
+                }
+            }
             _ = stop.changed() => {
                 let _ = socket.close(None).await;
                 break;
             }
         }
     }
-    state.lock().expect("state lock").studios.remove(&id);
+    let mut s = state.lock().expect("state lock");
+    s.studios.remove(&id);
+    // Requests this Studio will never answer: dropping their senders tells each waiting command.
+    s.pending.retain(|_, (studio, _)| *studio != id);
+    drop(s);
     log(&format!("{who} disconnected"));
+}
+
+fn answer(state: &Shared, request: u64, answer: Answer) {
+    let waiting = state.lock().expect("state lock").pending.remove(&request);
+    if let Some((_, tx)) = waiting {
+        let _ = tx.send(answer);
+    }
 }
 
 /// Answers a command's requests until it leaves.
@@ -203,19 +270,25 @@ async fn serve_cli(
     hello: CliHello,
     state: Shared,
     stop: watch::Sender<bool>,
-    port: u16,
+    config: Config,
 ) {
     if let Some(repo) = hello.repo {
         state.lock().expect("state lock").repos.insert(repo);
     }
     while let Some(message) = next_message(&mut socket).await {
         let reply = match message {
-            Ok(Message::Status) => Message::StatusReport(report(&state, port)),
+            Ok(Message::Status) => Message::StatusReport(report(&state, config.port)),
             Ok(Message::Stop) => {
                 let _ = send(&mut socket, &Message::Stopping).await;
                 let _ = socket.close(None).await;
                 let _ = stop.send(true);
                 return;
+            }
+            Ok(Message::ToStudio { place, request }) => {
+                match ask_studio(&state, place, request, config).await {
+                    Ok(reply) => Message::FromStudio { reply },
+                    Err(message) => Message::Error { message },
+                }
             }
             Ok(other) => Message::Error {
                 message: format!("forge serve doesn't take {other:?} from a command"),
@@ -228,6 +301,57 @@ async fn serve_cli(
     }
 }
 
+/// Sends a request to the one Studio on `place` and waits for its answer.
+async fn ask_studio(state: &Shared, place: u64, request: Json, config: Config) -> Answer {
+    let rx = {
+        let mut s = state.lock().expect("state lock");
+        let on_place: Vec<(u64, &Linked)> = s
+            .studios
+            .iter()
+            .filter(|(_, l)| l.hello.place == place)
+            .map(|(id, l)| (*id, l))
+            .collect();
+        let (studio, sender) = match on_place.as_slice() {
+            [] => {
+                return Err(format!(
+                    "no Studio with place {place} is linked to forge serve: open the place in Studio, with forge's \
+                     plugin installed (`forge status` lists what's linked)"
+                ));
+            }
+            [(id, linked)] => (*id, linked.requests.clone()),
+            many => {
+                let sessions: Vec<&str> =
+                    many.iter().map(|(_, l)| l.hello.session.as_str()).collect();
+                return Err(format!(
+                    "{} Studios have place {place} open (sessions {}): close all but one",
+                    many.len(),
+                    sessions.join(", ")
+                ));
+            }
+        };
+        s.next_id += 1;
+        let request_id = s.next_id;
+        let (tx, rx) = oneshot::channel();
+        s.pending.insert(request_id, (studio, tx));
+        if sender.send((request_id, request)).is_err() {
+            s.pending.remove(&request_id);
+            return Err("the Studio on that place just closed its link".into());
+        }
+        rx
+    };
+    match tokio::time::timeout(config.request_timeout, rx).await {
+        Ok(Ok(answer)) => answer,
+        Ok(Err(_)) => Err(format!(
+            "the Studio on place {place} closed its link before answering (a message over \
+             `server.max_message_mb` closes it too; the server's log says)"
+        )),
+        Err(_) => Err(format!(
+            "Studio didn't answer within {} ms (`server.request_timeout_ms`)",
+            config.request_timeout.as_millis()
+        )),
+    }
+}
+
 fn report(state: &Shared, port: u16) -> StatusReport {
     let s = state.lock().expect("state lock");
     StatusReport {
@@ -236,13 +360,13 @@ fn report(state: &Shared, port: u16) -> StatusReport {
         studios: s
             .studios
             .values()
-            .map(|(h, since)| Studio {
-                session: h.session.clone(),
-                place: h.place,
-                game: h.game,
-                name: h.name.clone(),
-                plugin: h.plugin.clone(),
-                connected_secs: since.elapsed().as_secs(),
+            .map(|l| Studio {
+                session: l.hello.session.clone(),
+                place: l.hello.place,
+                game: l.hello.game,
+                name: l.hello.name.clone(),
+                plugin: l.hello.plugin.clone(),
+                connected_secs: l.since.elapsed().as_secs(),
             })
             .collect(),
         repos: s.repos.iter().cloned().collect(),
@@ -260,7 +384,14 @@ async fn next_message(socket: &mut Socket) -> Option<Result<Message, String>> {
                         .map_err(|e| format!("a message forge can't read: {e}")),
                 );
             }
-            Ok(Frame::Close(_)) | Err(_) => return None,
+            Ok(Frame::Close(_)) => return None,
+            Err(err) => {
+                // A closed connection is normal; anything else (a message over the size limit) is worth a line.
+                if !matches!(err, WsError::ConnectionClosed | WsError::AlreadyClosed) {
+                    log(&format!("a connection ended: {err}"));
+                }
+                return None;
+            }
             Ok(_) => {}
         }
     }

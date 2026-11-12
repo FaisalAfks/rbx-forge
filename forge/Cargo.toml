@@ -9,6 +9,7 @@ repository.workspace = true
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
 dirs = "7.0.0"
+forge-sync = { path = "../tools/sync" }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 rbx_dom_weak = "4.2.0"
 rbx_xml = "3.0.1"

@@ -14,6 +14,7 @@ const DEFAULTS: &str = include_str!("../defaults.toml");
 pub struct Settings {
     pub server: Server,
     pub plugin: Plugin,
+    pub sync: Sync,
     pub watch: Watch,
 }
 
@@ -22,6 +23,21 @@ pub struct Settings {
 pub struct Server {
     pub port: u16,
     pub start_timeout_ms: u64,
+    pub request_timeout_ms: u64,
+    pub max_message_mb: usize,
+}
+
+impl Server {
+    pub fn max_message_bytes(&self) -> usize {
+        self.max_message_mb.saturating_mul(1024 * 1024)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Sync {
+    pub model_timeout_ms: u64,
+    pub yield_every: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

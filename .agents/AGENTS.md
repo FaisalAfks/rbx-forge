@@ -17,8 +17,8 @@ What's built next and why is in [docs/plan.md](../docs/plan.md); why things are 
 |---|---|
 | `forge/` | the `forge` binary (Rust): commands, settings (`defaults.toml`), a game's `forge.toml`, `forge serve` and packing the plugin |
 | `plugin/` | forge's Studio plugin (Luau): the link to `forge serve`; each tool's Studio side is in `tools/<name>/studio/` |
-| `tools/sync/` | sync's own code (Rust): values, schema, the instance tree, layout C on disk |
-| `docs/` | the plan, decisions, `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/format.md` (the disk format), and later a guide per tool |
+| `tools/sync/` | sync's own code (Rust): values, schema, the instance tree, layout C on disk, which properties to read (`properties.toml`); and `studio/`, its side in the plugin (Luau) |
+| `docs/` | the plan, decisions, `forge-toml.md`, `link.md` (the server, plugin and messages), `sync/format.md` (the disk format), `sync/pull.md`, and later a guide per tool |
 | `scripts/` | dev helpers (`setup-dev.ps1`) |
 | `.agents/` | this file and `skills/`: step-by-step how-tos (new task, probe, review, release) |
 
@@ -35,6 +35,7 @@ cargo run -- config                      # forge's settings and the nearest forg
 cargo run -- status                      # forge serve (started if needed) and the Studios linked to it
 cargo run -- plugin install              # pack plugin/ into forge.rbxmx in Studio's Plugins folder
 cargo run -- stop                        # stop forge serve (a running one locks target/debug/forge.exe)
+cargo run -- sync pull                   # in a game repo: write its trees from Studio to disk
 rokit install                            # the Luau tools (rokit.toml); then, as CI does:
 stylua --check plugin tools && selene plugin tools
 ```

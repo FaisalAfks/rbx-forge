@@ -1,6 +1,6 @@
 //! The `forge` command: one binary, a subcommand per tool. It reads forge's settings and a game's `forge.toml`, runs
-//! the server that holds the link to Studio, and installs forge's plugin; sync's commands join it step by step
-//! (docs/plan.md).
+//! the server that holds the link to Studio, installs forge's plugin, and pulls a game's trees to disk; the rest of
+//! sync's commands join it step by step (docs/plan.md).
 
 mod client;
 mod game;
@@ -8,6 +8,7 @@ mod pack;
 mod protocol;
 mod server;
 mod settings;
+mod sync;
 
 use std::path::{Path, PathBuf};
 
@@ -50,10 +51,25 @@ enum Command {
     Stop,
     /// Show the server, the Studios connected to it, and the game repo each one belongs to.
     Status,
+    /// Sync a game's trees between Studio and its repo (forge.toml names them).
+    Sync {
+        #[command(subcommand)]
+        command: SyncCommand,
+    },
     /// forge's Studio plugin.
     Plugin {
         #[command(subcommand)]
         command: PluginCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum SyncCommand {
+    /// Write each tree in forge.toml from the Studio that has the place open to its folder.
+    Pull {
+        /// Pull into a folder forge didn't make, leave files forge doesn't write, and write over uncommitted changes.
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -83,7 +99,18 @@ fn run(cli: Cli) -> Result<()> {
     let settings = || settings::load(file);
     match cli.command {
         Command::Config { dir } => show_config(file, &dir),
-        Command::Serve { log } => block_on(server::run(settings()?.server.port, log.as_deref())),
+        Command::Serve { log } => {
+            let s = settings()?.server;
+            let config = server::Config {
+                port: s.port,
+                request_timeout: std::time::Duration::from_millis(s.request_timeout_ms),
+                max_message_bytes: s.max_message_bytes(),
+            };
+            block_on(server::run(config, log.as_deref()))
+        }
+        Command::Sync { command } => match command {
+            SyncCommand::Pull { force } => block_on(sync::pull(&settings()?, file, force)),
+        },
         Command::Stop => block_on(stop(&settings()?, file)),
         Command::Status => block_on(status(&settings()?, file)),
         Command::Plugin { command } => match command {
@@ -107,7 +134,7 @@ fn block_on<F: std::future::Future<Output = Result<()>>>(future: F) -> Result<()
 }
 
 /// The game repo the command runs in, so the server can match its place to a Studio.
-fn this_repo() -> Result<Option<Repo>> {
+pub(crate) fn this_repo() -> Result<Option<Repo>> {
     let dir = std::env::current_dir().context("can't read the current folder")?;
     let Some(path) = game::find(&dir) else {
         return Ok(None);

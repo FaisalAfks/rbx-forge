@@ -10,6 +10,9 @@ use std::time::Duration;
 
 use tungstenite::{Message, WebSocket};
 
+/// The link protocol this forge speaks (forge/src/protocol.rs).
+const PROTOCOL: u32 = 2;
+
 /// A server of its own for one test: its own port and settings file, stopped when the test ends, pass or fail.
 struct Server {
     dir: PathBuf,
@@ -138,7 +141,7 @@ fn status_starts_the_server_and_lists_a_studio_with_its_repo() {
         "{first_text}"
     );
 
-    let (_studio, welcome) = server.studio(42, 1);
+    let (_studio, welcome) = server.studio(42, PROTOCOL);
     assert!(welcome.contains(r#""op":"welcome""#), "{welcome}");
 
     let second = text(&server.forge(&["status"], &repo));
@@ -158,7 +161,7 @@ fn a_studio_links_up_again_after_the_server_restarts() {
     let server = Server::new("restart");
     let repo = game_repo(&server, 7);
     assert!(server.forge(&["status"], &repo).status.success());
-    let (mut studio, _) = server.studio(7, 1);
+    let (mut studio, _) = server.studio(7, PROTOCOL);
 
     let stopped = text(&server.forge(&["stop"], &repo));
     assert!(stopped.contains("stopped forge serve"), "{stopped}");
@@ -173,7 +176,7 @@ fn a_studio_links_up_again_after_the_server_restarts() {
 
     let restarted = text(&server.forge(&["status"], &repo));
     assert!(restarted.contains("started forge serve"), "{restarted}");
-    let (_studio, welcome) = server.studio(7, 1);
+    let (_studio, welcome) = server.studio(7, PROTOCOL);
     assert!(welcome.contains("welcome"), "{welcome}");
     assert!(text(&server.forge(&["status"], &repo)).contains("studio: place 7"));
 }
