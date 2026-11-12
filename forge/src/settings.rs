@@ -38,6 +38,7 @@ impl Server {
 pub struct Sync {
     pub model_timeout_ms: u64,
     pub yield_every: u64,
+    pub confirm_timeout_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

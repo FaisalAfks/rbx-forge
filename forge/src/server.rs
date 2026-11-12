@@ -293,7 +293,15 @@ async fn serve_cli(
                 let _ = stop.send(true);
                 return;
             }
-            Ok(Message::ToStudio { place, request }) => {
+            Ok(Message::ToStudio {
+                place,
+                request,
+                timeout_ms,
+            }) => {
+                let mut config = config;
+                if let Some(ms) = timeout_ms {
+                    config.request_timeout = Duration::from_millis(ms);
+                }
                 match ask_studio(&state, place, request, config).await {
                     Ok(reply) => Message::FromStudio { reply },
                     Err(message) => Message::Error { message },

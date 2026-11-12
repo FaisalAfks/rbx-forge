@@ -33,6 +33,16 @@ pub fn write(tree: &Node, schema: &Schema) -> Result<Files> {
     Ok(files)
 }
 
+/// Each node's disk path from the root, `/`-separated (the root's is empty), by id: the paths `write` gives them.
+pub fn disk_paths(tree: &Node, schema: &Schema) -> HashMap<u32, String> {
+    let mut keys = KeyMap::default();
+    assign_keys(tree, schema, &mut Vec::new(), &mut keys);
+    keys.paths
+        .into_iter()
+        .map(|(id, p)| (id, p.join("/")))
+        .collect()
+}
+
 /// Each node's path of disk names from the root (the root's is empty).
 #[derive(Default)]
 struct KeyMap {

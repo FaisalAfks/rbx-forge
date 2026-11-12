@@ -25,6 +25,8 @@ open_timeout_ms = 5000
 model_timeout_ms = 10000
 # How many instances the plugin reads before it lets Studio run a frame, so a big tree never freezes Studio.
 yield_every = 500
+# How long a push's plan waits in Studio for Apply or Cancel before it's cancelled on its own.
+confirm_timeout_ms = 600000
 
 [watch]
 # How long an instance in Studio must stay unchanged before its changes are sent, so a drag is one change (0013).

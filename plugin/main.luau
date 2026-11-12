@@ -4,11 +4,19 @@
 
 local RunService = game:GetService("RunService")
 
+local confirm = require(script.confirm)
 local link = require(script.link)
 
 -- Each tool's Studio side (tools/<name>/studio/, packed under tools), by the name commands ask for.
-local tools: { [string]: { handle: (request: any) -> any } } = {
+local tools: { [string]: { handle: (request: any, context: any) -> any } } = {
 	sync = require(script.tools.sync.main),
+}
+
+-- What the plugin gives every tool: the parts that need the plugin object.
+local context = {
+	confirm = function(ask)
+		return confirm.ask(plugin, ask)
+	end,
 }
 
 local function handle(request: any): any
@@ -16,7 +24,7 @@ local function handle(request: any): any
 	if tool == nil then
 		error(`forge's plugin has no tool {request.tool}: run forge plugin install`)
 	end
-	return tool.handle(request)
+	return tool.handle(request, context)
 end
 
 -- Plugins also load into each playtest's client and server. Only the edit session is synced.

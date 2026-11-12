@@ -208,7 +208,7 @@ fn compare(
     Ok(())
 }
 
-fn sorted(tags: &[String]) -> Vec<&String> {
+pub(crate) fn sorted(tags: &[String]) -> Vec<&String> {
     let mut t: Vec<&String> = tags.iter().collect();
     t.sort();
     t
@@ -229,7 +229,7 @@ fn lines(a: &str, b: &str) -> (usize, usize) {
 }
 
 /// Paths whose parent isn't in the set: the tops of the subtrees the set covers.
-fn roots<'a>(set: &BTreeSet<&'a String>) -> Vec<&'a String> {
+pub(crate) fn roots<'a>(set: &BTreeSet<&'a String>) -> Vec<&'a String> {
     set.iter()
         .filter(|p| match p.rsplit_once('/') {
             Some((parent, _)) => !set.contains(&parent.to_string()),
@@ -240,20 +240,32 @@ fn roots<'a>(set: &BTreeSet<&'a String>) -> Vec<&'a String> {
 }
 
 /// One copy of the tree, by disk path.
-struct Index<'a> {
-    nodes: BTreeMap<String, &'a Node>,
+pub(crate) struct Index<'a> {
+    pub(crate) nodes: BTreeMap<String, &'a Node>,
     /// Each node's path by id, for writing references as paths.
-    paths: HashMap<u32, String>,
+    pub(crate) paths: HashMap<u32, String>,
 }
 
 impl<'a> Index<'a> {
-    fn new(root: &'a Node) -> Index<'a> {
+    /// A tree read from files, whose nodes carry their disk names.
+    pub(crate) fn new(root: &'a Node) -> Index<'a> {
         let mut index = Index {
             nodes: BTreeMap::new(),
             paths: HashMap::new(),
         };
         index.add(root, String::new());
         index
+    }
+
+    /// A tree with its disk paths given by id (`layout::disk_paths`), keeping its own ids.
+    pub(crate) fn with_paths(root: &'a Node, paths: HashMap<u32, String>) -> Index<'a> {
+        let mut nodes = BTreeMap::new();
+        for n in root.walk() {
+            if let Some(p) = paths.get(&n.id) {
+                nodes.insert(p.clone(), n);
+            }
+        }
+        Index { nodes, paths }
     }
 
     fn add(&mut self, node: &'a Node, path: String) {
@@ -271,7 +283,7 @@ impl<'a> Index<'a> {
     }
 
     /// A value as written on disk, with references inside the tree as `@path`.
-    fn show(&self, v: &Value) -> Result<String> {
+    pub(crate) fn show(&self, v: &Value) -> Result<String> {
         v.to_toml(&|t| {
             Ok(match t {
                 RefTarget::Node(id) => match self.paths.get(id) {
@@ -286,7 +298,7 @@ impl<'a> Index<'a> {
 
     /// A subtree's content, for finding the same subtree under another path. The top's own name is left out, so a
     /// rename matches; references are written relative to the subtree's top, so a moved subtree's inner links match.
-    fn print(&self, path: &str) -> Result<String> {
+    pub(crate) fn print(&self, path: &str) -> Result<String> {
         let mut out = String::new();
         self.print_into(self.nodes[path], path, path, true, &mut out)?;
         Ok(out)
@@ -341,6 +353,62 @@ impl<'a> Index<'a> {
             out.push('}');
         }
         Ok(())
+    }
+}
+
+impl Change {
+    /// The change as a push describes it, for changes worked out from Studio's copy to the files: what the push does
+    /// to Studio, old value first.
+    pub fn push_line(&self) -> String {
+        let at = |p: &str| {
+            if p.is_empty() {
+                "(top)".to_string()
+            } else {
+                p.to_string()
+            }
+        };
+        let inside = |n: usize| {
+            if n == 0 {
+                String::new()
+            } else {
+                format!(", {n} inside")
+            }
+        };
+        match self {
+            Change::Added {
+                path,
+                class,
+                inside: n,
+            } => format!("+ {} ({class}{}): added", at(path), inside(*n)),
+            Change::Removed {
+                path,
+                class,
+                inside: n,
+            } => format!("- {} ({class}{}): removed", at(path), inside(*n)),
+            Change::Moved { from, to, class } => {
+                format!("> {} -> {} ({class}): moved or renamed", at(from), at(to))
+            }
+            Change::Value {
+                path,
+                what,
+                disk,
+                studio,
+            } => format!(
+                "~ {} {what}: {} -> {}",
+                at(path),
+                disk.as_deref().unwrap_or("(unset)"),
+                studio.as_deref().unwrap_or("(unset)")
+            ),
+            Change::Source {
+                path,
+                added,
+                removed,
+            } => format!("~ {} script: +{added} -{removed} lines", at(path)),
+            Change::Model { path } => format!("~ {} model file: replaced", at(path)),
+            Change::Class { path, disk, studio } => {
+                format!("! {}: the {disk} is replaced by a {studio}", at(path))
+            }
+        }
     }
 }
 
