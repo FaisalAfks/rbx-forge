@@ -59,7 +59,7 @@ stylua --check plugin tools && selene plugin tools
 - Merge a PR (squash) once its checks pass. Never on red, and never re-run a check to get past a flaky failure.
 - Releases: SemVer tags `vX.Y.Z` on `main`, with a GitHub release and short notes (`.agents/skills/release`). Never
   move or delete a tag.
-- Commit as the owner: `git -c user.name=FaisalAfks -c user.email=fmehmadi9@gmail.com commit`.
+- Commit as the owner: `git -c user.name=FaisalAfks -c user.email=174430734+FaisalAfks@users.noreply.github.com commit`.
 
 **Writing** (commits, PRs, issues, releases, changelog, docs, comments)
 - In the owner's voice: plain, minimal, simple.
